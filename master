@@ -29,7 +29,7 @@ local kw_pusher_fb_top  = "LVL 15"
 
 -- === Deploy Keywords ===
 local kw_deploy     = "deploy"
-local kw_deploy_fb  = "deployed"
+local kw_deploy_fb  = "RD"
 
 -- === Communication Functions ===
 
