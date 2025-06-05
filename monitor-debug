@@ -1,0 +1,56 @@
+-- === Setup ===
+local modem = peripheral.find("modem") or error("No modem found")
+local monitor = peripheral.find("monitor") or error("No monitor found")
+rednet.open(peripheral.getName(modem))
+
+local master_id = 1
+local ptc_control = "sky-control"
+
+-- === Button Config ===
+local actions = {
+    { label = "Drill Forward",  msg = "forward" },
+    { label = "Drill Backward", msg = "backward" },
+    { label = "Drill Toggle",   msg = "toggle" },
+    { label = "Deploy",         msg = "deploy" },
+    { label = "Plate +1",       msg = 1 },
+    { label = "To Ground",      msg = -15 },
+    { label = "To Top",         msg = 15 },
+    { label = "Exit",           msg = "exit" }
+}
+
+-- === Monitor Layout ===
+monitor.setTextScale(0.5)
+monitor.setBackgroundColor(colors.black)
+monitor.clear()
+local w, h = monitor.getSize()
+local btn_w, btn_h, spacing = 13, 3, 2
+local btns = {}
+
+for i, a in ipairs(actions) do
+    local col = (i - 1) % 2
+    local row = math.floor((i - 1) / 2)
+    local x = 2 + col * (btn_w + spacing)
+    local y = 1 + row * (btn_h + spacing)
+
+    table.insert(btns, { x = x, y = y, w = btn_w, h = btn_h, action = a.msg })
+
+    for dy = 0, btn_h - 1 do
+        monitor.setCursorPos(x, y + dy)
+        monitor.setBackgroundColor(colors.gray)
+        monitor.setTextColor(colors.white)
+        monitor.write(string.rep(" ", btn_w))
+    end
+    monitor.setCursorPos(x + math.floor((btn_w - #a.label) / 2), y + 1)
+    monitor.write(a.label)
+end
+
+-- === Touch Event ===
+while true do
+    local _, _, tx, ty = os.pullEvent("monitor_touch")
+    for _, btn in ipairs(btns) do
+        if tx >= btn.x and tx <= btn.x + btn.w - 1 and ty >= btn.y and ty <= btn.y + btn.h - 1 then
+            if btn.action == "exit" then os.shutdown() end
+            rednet.send(master_id, btn.action, ptc_control)
+        end
+    end
+end
