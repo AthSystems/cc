@@ -1,19 +1,20 @@
 -- Node Block Pusher
+
+
+local name = "pusherNode"
+local gear_side = "top"
+
+
 local modem = peripheral.find("modem") or error("No modem found", 0)
 local gearshift = peripheral.wrap("bottom")
 rednet.open(peripheral.getName(modem))
 
-local nodeID = os.getComputerID()
-local rs_5m_up = "left"
-local rs_1m_up = "bottom"
-local rs_15_down = "right"
-local name = "pusherNode"
 
 print("Node " .. name .. " ready")
 
 
 function move_plate(length, speed)
-  p.move(length, speed)
+  gearshift.move(length, speed)
 end
 
 move_plate(15,-2)
