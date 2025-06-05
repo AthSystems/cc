@@ -2,10 +2,19 @@
 local modem = peripheral.find("modem") or error("No modem found", 0)
 rednet.open(peripheral.getName(modem))
 
+
+-- To Modify
+local node_name = "undefined"
 local feedback_command = "undefined"
 local redstone_side = "undefined"
+
+
+
 local feedback_sent = false
 local last_redstone_state = false
+
+print("Node ".. node_name .. " : ready.")
+
 
 while true do
   local state = redstone.getInput(redstone_side)
