@@ -1,7 +1,7 @@
 local modem = peripheral.find("modem") or error("No modem", 0)
 rednet.open(peripheral.getName(modem))
 
-local nodeDrills = "drillsNode"
+local nodeDrills = 0
 
 
 function send(id, message)
