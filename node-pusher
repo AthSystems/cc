@@ -18,16 +18,18 @@ end
 
 
 while true do
-    local senderID, msg = rednet.receive()
+  local senderID, msg = rednet.receive()
+  print("Message received : " .. msg)
+  local l = tonumber(msg)
+  local s = 2
 
-    if msg == "5m" then
-      move_plate(5, 2)
-      rednet.send(senderID, name .. ": Moving 5m upward.")
-    elseif msg == "1m" then
-      move_plate(1, 2)
-      rednet.send(senderID, name .. ": Moving 1m upward.")
-    else
-      move_plate(15, -2)
-      rednet.send(senderID, name .. ": Moving back to ground.")
-    end
+  if l < 0 then
+    s = -2
+  end
+
+  move_plate(l,s)
+  rsp = "Set at " .. tostring(l)
+  rednet.send(senderID, rsp)
+  print(rsp)
+
 end
