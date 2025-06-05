@@ -2,58 +2,37 @@
 local modem = peripheral.find("modem") or error("No modem found")
 rednet.open(peripheral.getName(modem))
 
--- === Node IDs ===
-local nodeDrills = 0
-local nodePusher = 5
-local nodeDeploy = 20
+-- === Target Node IDs ===
+local nodeDrills  = 0
+local nodePusher  = 5
+local nodeDeploy  = 20
 local nodeMonitor = 24
--- === Communication Functions ===
 
-function logs(message)
-    print(message)
-    rednet.broadcast(message, "skylog")
-end
+-- === Ping Utility ===
+function pingNode(nodeID, timeout)
+    local startTime = os.clock()
 
-function send(id, message)
-    rednet.send(id, msg)
-    logs("To " .. id .. ": " .. message)
-end
+    print("📡 Pinging node ID:", nodeID)
+    rednet.send(nodeID, "ping", "farm-ping")
 
-
--- === Reply Handlers ===
-
--- Wait with timeout for reply
-function waitForReplyWithTimeout(keyword, timeout)
-    local start = os.clock()
     while true do
-        local remaining = timeout - (os.clock() - start)
-        if remaining <= 0 then
-            logs("Timeout waiting for: " .. keyword)
-            return nil, nil
+        local timeLeft = timeout - (os.clock() - startTime)
+        if timeLeft <= 0 then
+            print("No response from node", nodeID)
+            return false
         end
 
-        local _, msg = rednet.receive(remaining)
-        if msg and msg:find(keyword) then
-            logs(msg)
-            local lvlStr = string.match(msg, "LVL ?(%d+)")
-            local level = tonumber(lvlStr)
-            return msg, level
+        local senderID, message, protocol = rednet.receive("farm-pong", timeLeft)
+        if senderID == nodeID and message == "pong" then
+            print("Pong received from node", nodeID)
+            return true
         end
     end
 end
 
--- Send and wait with timeout
-function sendAndWaitWithTimeout(id, message, waitFor, timeout)
-    send(id, message)
-    local reply, level = waitForReplyWithTimeout(waitFor, timeout)
-    return reply, level
+-- === Ping Each Node ===
+local nodes = { nodeDrills, nodePusher, nodeDeploy, nodeMonitor }
+
+for _, nodeID in ipairs(nodes) do
+    pingNode(nodeID, 5)
 end
-
-
-function ping(nodeId)
-  sendAndWaitWithTimeout(nodeId, "ping", "pong", 5)
-end
-
-ping(nodeDrills)
-ping(nodePusher)
-ping(nodeDeploy)
