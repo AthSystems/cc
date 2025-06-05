@@ -1,21 +1,41 @@
 -- Node - Deployer
+local gearshift_side = "back"
+local gearshift = peripheral.wrap(gearshift_side)
+
 local modem = peripheral.find("modem") or error("No modem found", 0)
 rednet.open(peripheral.getName(modem))
 
-local nodeID = os.getComputerID()
-local controlledSide = "back"
 local name = "deployNode"
-local master_id = 1
+
+local max_speed = 2
+local direction_mod = -1
+local speed = max_speed * direction_mod
 
 print("Node " .. name .. " ready")
+
+function move(length, d)
+    gearshift.move(length, d*speed)
+    while gearshift.isRunning() do
+        sleep(0.1)
+    end
+end
+
+function deploy()
+    move(10,1)
+    move(1,-1)
+    move(1,1)
+    move(1,-1)
+    move(1,1)
+    move(1,-1)
+    move(1,1)
+    move(10,-1)
+end
 
 while true do
     local senderID, msg = rednet.receive()
     
     if msg == "deploy" then
-        redstone.setOutput(controlledSide, true)
-        rednet.send(senderID, name .. ": Moving frontward.")
-        sleep(1)
-        redstone.setOutput(controlledSide, false)
+        deploy()
+        rednet.send(senderID, "Deploy done. [RD]")
    end
 end
