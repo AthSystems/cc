@@ -39,3 +39,59 @@ while true do
   sleep(0.5)
 end
  
+
+
+-- === Setup ===
+local modem = peripheral.find("modem") or error("No modem found")
+rednet.open(peripheral.getName(modem))
+
+-- === Configuration (SET THESE PER NODE) ===
+local node_level = 0                    
+local node_side = 0                     -- 0 = right, 1 = left
+local node_name = "LV" .. tostring(node_level)
+local master_id = 1                     
+
+-- === Derived Values ===
+local fb_cmd = "LVL " .. tostring(node_level)
+local fb_side = (node_side == 0) and "right" or "left"
+
+-- === Protocols ===
+local ptc_reply = "sky-reply"
+local ptc_logs  = "sky-logs"
+
+-- === State Tracking ===
+local feedback_sent = false
+local last_redstone_state = false
+
+-- === Utilities ===
+local function prompt(msg)
+    print("[" .. os.date("%H:%M:%S") .. "] " .. msg)
+end
+
+
+local function log(msg)
+    prompt(msg)
+    rednet.broadcast("[" .. node_name .. "] : " .. msg, ptc_logs)
+end
+
+log("Ready. Watching side: " .. fb_side)
+
+-- === Main Loop ===
+while true do
+    local state = redstone.getInput(fb_side)
+
+    if state ~= last_redstone_state then
+        last_redstone_state = state
+
+        if state then
+            rednet.send(master_id, "[ " .. node_name .. " ] : " .. fb_cmd, ptc_reply)
+            log("Feedback sent: " .. fb_cmd)
+            feedback_sent = true
+        else
+            feedback_sent = false
+            log("Redstone signal off")
+        end
+    end
+
+    sleep(0.5)
+end
