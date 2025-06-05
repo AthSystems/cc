@@ -6,50 +6,57 @@ rednet.open(peripheral.getName(modem))
 local nodeDrills = 0
 local nodePusher = 5
 local nodeDeploy = 20
-local ptc_control = "sky-control"
+local ptc_control = "sky-debug"
 local ptc_logs = "sky-logs"
 
 -- === State ===
 local drill_state = false
 
--- === Helpers ===
+-- === Logging ===
 local function log(msg)
-    print(msg)
+    print("[DEBUG] " .. msg)
     rednet.broadcast(msg, ptc_logs)
 end
 
-local function send(id, msg)
-    rednet.send(id, msg, ptc_control)
-    log("Sent to " .. id .. ": " .. tostring(msg))
+-- === Control Map ===
+local function handleCommand(cmd)
+    if cmd == "drill_fwd" then
+        rednet.send(nodeDrills, "forward", ptc_control)
+        log("Drill → Forward")
+
+    elseif cmd == "drill_bwd" then
+        rednet.send(nodeDrills, "backward", ptc_control)
+        log("Drill → Backward")
+
+    elseif cmd == "drill_toggle" then
+        local dir = drill_state and "backward" or "forward"
+        rednet.send(nodeDrills, dir, ptc_control)
+        log("Drill → " .. dir)
+        drill_state = not drill_state
+
+    elseif cmd == "deploy" then
+        rednet.send(nodeDeploy, "deploy", ptc_control)
+        log("Deploy")
+
+    elseif cmd == "plate_up" then
+        rednet.send(nodePusher, 1, ptc_control)
+        log("Pusher → +1")
+
+    elseif cmd == "plate_ground" then
+        rednet.send(nodePusher, -15, ptc_control)
+        log("Pusher → Ground")
+
+    elseif cmd == "plate_top" then
+        rednet.send(nodePusher, 15, ptc_control)
+        log("Pusher → Top")
+    end
 end
 
--- === Actions ===
-local actions = {
-    { key = "1", label = "Drill Forward",  func = function() send(nodeDrills, "forward") end },
-    { key = "2", label = "Drill Backward", func = function() send(nodeDrills, "backward") end },
-    { key = "3", label = "Drill Toggle",   func = function()
-        send(nodeDrills, drill_state and "backward" or "forward")
-        drill_state = not drill_state
-    end },
-    { key = "4", label = "Deploy",         func = function() send(nodeDeploy, "deploy") end },
-    { key = "5", label = "Plate +1",       func = function() send(nodePusher, 1) end },
-    { key = "6", label = "To Ground",      func = function() send(nodePusher, -15) end },
-    { key = "7", label = "To Top",         func = function() send(nodePusher, 15) end },
-    { key = "q", label = "Quit",           func = function() log("Exiting Debug Menu") os.exit() end },
-}
-
--- === Menu Loop ===
+-- === Listener ===
+log("Debug listener started")
 while true do
-    print("\n=== Manual Debug Menu ===")
-    for _, a in ipairs(actions) do
-        print("[" .. a.key .. "] " .. a.label)
-    end
-    write("Choose action: ")
-    local input = read()
-    for _, a in ipairs(actions) do
-        if input == a.key then
-            a.func()
-            break
-        end
+    local _, msg, protocol = rednet.receive(ptc_control)
+    if type(msg) == "string" then
+        handleCommand(msg)
     end
 end
