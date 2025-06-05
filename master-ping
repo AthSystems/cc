@@ -2,37 +2,62 @@
 local modem = peripheral.find("modem") or error("No modem found")
 rednet.open(peripheral.getName(modem))
 
--- === Target Node IDs ===
-local nodeDrills  = 0
-local nodePusher  = 5
-local nodeDeploy  = 20
-local nodeMonitor = 24
+-- === Metadata ===
+local ptc_ping   = "sky-status"
+local ptc_pong   = "sky-reply"
+local ptc_logs   = "sky-logs"
+local timeout_s  = 5
 
--- === Ping Utility ===
-function pingNode(nodeID, timeout)
+-- === Node IDs ===
+local nodeDrills   = 0
+local nodePusher   = 5
+local nodeDeploy   = 20
+local nodeDrawer   = 23
+local nodeMonitor  = 24
+
+local nodes = {
+  { id = nodeDrills,  name = "drill_node" },
+  { id = nodePusher,  name = "pusher_node" },
+  { id = nodeDeploy,  name = "deploy_node" },
+  { id = nodeDrawer,  name = "drawer_node" },
+  { id = nodeMonitor, name = "monitor_node" }
+}
+
+-- === Utilities ===
+local function prompt(msg)
+    print("[" .. os.date("%H:%M:%S") .. "] " .. msg)
+end
+
+local function log(msg)
+    prompt(msg)
+    rednet.broadcast("[master] : " .. msg, ptc_logs)
+end
+
+-- === Ping Function ===
+local function pingNode(node)
     local startTime = os.clock()
+    local nodeID = node.id
+    local nodeName = node.name
 
-    print("📡 Pinging node ID:", nodeID)
-    rednet.send(nodeID, "ping", "farm-ping")
+    log("📡 Pinging " .. nodeName .. " (ID: " .. nodeID .. ")...")
+    rednet.send(nodeID, "ping", ptc_ping)
 
     while true do
-        local timeLeft = timeout - (os.clock() - startTime)
+        local timeLeft = timeout_s - (os.clock() - startTime)
         if timeLeft <= 0 then
-            print("No response from node", nodeID)
+            log("❌ No response from " .. nodeName)
             return false
         end
 
-        local senderID, message, protocol = rednet.receive("farm-pong", timeLeft)
+        local senderID, message, protocol = rednet.receive(ptc_pong, timeLeft)
         if senderID == nodeID and message == "pong" then
-            print("Pong received from node", nodeID)
+            log("✅ Pong received from " .. nodeName)
             return true
         end
     end
 end
 
--- === Ping Each Node ===
-local nodes = { nodeDrills, nodePusher, nodeDeploy, nodeMonitor }
-
-for _, nodeID in ipairs(nodes) do
-    pingNode(nodeID, 5)
+-- === Main Loop (One-shot test) ===
+for _, node in ipairs(nodes) do
+    pingNode(node)
 end
