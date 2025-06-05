@@ -1,0 +1,21 @@
+-- Node - Deployer
+local modem = peripheral.find("modem") or error("No modem found", 0)
+rednet.open(peripheral.getName(modem))
+
+local nodeID = os.getComputerID()
+local controlledSide = "back"
+local name = "deployNode"
+local master_id = 1
+
+print("Node " .. name .. " ready")
+
+while true do
+    local senderID, msg = rednet.receive()
+    
+    if msg == "deploy" then
+        redstone.setOutput(controlledSide, true)
+        rednet.send(senderID, name .. ": Moving frontward.")
+        sleep(1)
+        redstone.setOutput(controlledSide, false)
+   end
+end
