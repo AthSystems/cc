@@ -1,35 +1,3 @@
--- Node Feedback Template
-local modem = peripheral.find("modem") or error("No modem found", 0)
-rednet.open(peripheral.getName(modem))
-
-
--- To Modify
-local node_name = "undefined"
-local feedback_command = "undefined"
-local redstone_side = "undefined"
-
-
-
-local feedback_sent = false
-local last_redstone_state = false
-
-print("Node ".. node_name .. " : ready.")
-
-
-while true do
-  local state = redstone.getInput(redstone_side)
-  if(state ~= last_redstone_state) then
-    last_redstone_state = state
-    if last_redstone_state then
-      rednet.send(1, "[ " .. node_name .. "] : " .. feedback_command)
-      feedback_sent = true
-    else
-      feeback_sent = false
-    end
-  end
-  sleep(0.5)
-end
-
 -- === Setup ===
 local modem = peripheral.find("modem") or error("No modem found")
 rednet.open(peripheral.getName(modem))
@@ -52,7 +20,12 @@ local function prompt(msg)
     print("[" .. os.date("%H:%M:%S") .. "] " .. msg)
 end
 
-prompt(node_name .. "ready. Listening on " .. redstone_side .. ".")
+local function log(msg)
+    prompt(msg)
+    rednet.broadcast("[" .. node_name .. "] : " .. msg, ptc_logs)
+end
+
+log(node_name .. "ready. Listening on " .. redstone_side .. ".")
 
 -- === Loop: Watch redstone input ===
 while true do
