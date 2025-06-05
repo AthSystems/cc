@@ -3,60 +3,78 @@ local modem = peripheral.find("modem") or error("No modem found")
 local monitor = peripheral.find("monitor") or error("No monitor found")
 rednet.open(peripheral.getName(modem))
 
--- === Configuration ===
+-- === Config ===
 local master_id = 1
-local stop_button_label = "[ STOP ]"
-local stop_button_color = colors.red
-local button_sent_color = colors.green
+local ptc_logs = "sky-logs"
+local ptc_control = "sky-control"
+local stop_button_label = "[   STOP   ]"
+local clear_button_label = "[ CLEAR ]"
 
--- === Display Settings ===
+-- === ID to Name Map ===
+local idMap = {
+    [0] = "Drills",
+    [1] = "Master",
+    [2] = "DFF",
+    [3] = "DFB",
+    [5] = "Pusher",
+    [6] = "LV 0", [7] = "LV 6", [8] = "LV 8", [9] = "LV 10",
+    [10] = "LV 12", [11] = "LV 14", [12] = "LV 5", [13] = "LV 7",
+    [14] = "LV 9", [15] = "LV 11", [16] = "LV 13", [17] = "LV 15",
+    [20] = "Deployer",
+    [23] = "Drawer",
+    [24] = "Monitor"
+}
+
+-- === Monitor Setup ===
 monitor.setTextScale(0.5)
 monitor.setBackgroundColor(colors.black)
 monitor.clear()
-
 local width, height = monitor.getSize()
 local lines = {}
 
 -- === Utilities ===
-local function drawLines()
+local function drawUI()
     monitor.setBackgroundColor(colors.black)
     monitor.clear()
 
-    -- Draw logs
     local logHeight = height - 1
     for i, entry in ipairs(lines) do
         if i > logHeight then break end
         monitor.setCursorPos(1, i)
 
-        -- Time in green
         monitor.setTextColor(colors.lime)
         monitor.write(entry.time .. " | ")
 
-        -- Source in orange
         monitor.setTextColor(colors.orange)
         monitor.write(entry.source)
 
-        -- Message in white
         monitor.setTextColor(colors.white)
-        monitor.write(" → " .. entry.message)
+        monitor.write(" -> " .. entry.message)
     end
 
-    -- Draw STOP button
+    -- STOP button (centered)
     monitor.setCursorPos(math.floor((width - #stop_button_label) / 2), height)
-    monitor.setBackgroundColor(stop_button_color)
+    monitor.setBackgroundColor(colors.red)
     monitor.setTextColor(colors.white)
     monitor.write(stop_button_label)
+
+    -- CLEAR button (bottom-right)
+    monitor.setCursorPos(width - #clear_button_label + 1, height)
+    monitor.setBackgroundColor(colors.gray)
+    monitor.setTextColor(colors.white)
+    monitor.write(clear_button_label)
 end
 
-local function addLine(source, message)
+local function addLine(senderID, message)
     local time = os.date("%H:%M:%S")
-    table.insert(lines, { time = time, source = source, message = message })
+    local name = idMap[senderID] or ("ID:" .. tostring(senderID))
+    table.insert(lines, { time = time, source = name, message = message })
 
     if #lines > (height - 1) then
         table.remove(lines, 1)
     end
 
-    drawLines()
+    drawUI()
 end
 
 local function formatFromTable(tbl)
@@ -68,43 +86,35 @@ local function formatFromTable(tbl)
     return source, msg
 end
 
--- === Monitor Touch Handler ===
-local function listenTouch()
+-- === Listeners ===
+local function listenLogs()
     while true do
-        local event, side, x, y = os.pullEvent("monitor_touch")
+        local senderID, msg, protocol = rednet.receive(ptc_logs)
 
-        if y == height then
-            -- Button touched: send stop signal
-            rednet.send(master_id, "stop", "sky-control")
-
-            -- Confirm feedback
-            table.insert(lines, { time = os.date("%H:%M:%S"), source = "monitor", message = "STOP sent to master" })
-            monitor.setBackgroundColor(button_sent_color)
-            drawLines()
-            sleep(1)
-
-            -- Reset button color
-            monitor.setBackgroundColor(colors.black)
-            drawLines()
+        if type(msg) == "string" then
+            addLine(senderID, msg)
+        elseif type(msg) == "table" then
+            local src, body = formatFromTable(msg)
+            addLine(senderID, body)
+        else
+            addLine(senderID, "Invalid message type")
         end
     end
 end
 
--- === Main Log Receiver ===
-local function listenLogs()
-    print("🖥️ Monitor listener running (protocol: sky-logs)...")
+local function listenTouch()
     while true do
-        local _, msg, protocol = rednet.receive("sky-logs")
+        local _, _, x, y = os.pullEvent("monitor_touch")
 
-        if type(msg) == "string" then
-            addLine("unknown", msg)
-
-        elseif type(msg) == "table" then
-            local src, body = formatFromTable(msg)
-            addLine(src, body)
-
-        else
-            addLine("system", "⚠️ Invalid message type")
+        if y == height then
+            if x >= math.floor((width - #stop_button_label) / 2) and x <= math.floor((width + #stop_button_label) / 2) then
+                rednet.send(master_id, "stop", ptc_control)
+                table.insert(lines, { time = os.date("%H:%M:%S"), source = "Monitor", message = "STOP sent to master" })
+                drawUI()
+            elseif x >= width - #clear_button_label + 1 and x <= width then
+                lines = {}
+                drawUI()
+            end
         end
     end
 end
