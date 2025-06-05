@@ -77,29 +77,30 @@ function move_block_pusher(lvl)
 end
         
 
-sleep(10)
---5
+sleep(5)
 move_block_pusher(5)
-sleep(3)
---6
+toggleDrills()
 move_block_pusher(1)
-sleep(3)
---6
-move_block_pusher(5)
-sleep(3)
---7
+toggleDrills()
 move_block_pusher(1)
--- 8 -> 15
+toggleDrills()
 move_block_pusher(1)
+toggleDrills()
 move_block_pusher(1)
+toggleDrills()
 move_block_pusher(1)
+toggleDrills()
 move_block_pusher(1)
+toggleDrills()
 move_block_pusher(1)
+toggleDrills()
 move_block_pusher(1)
+toggleDrills()
 move_block_pusher(1)
-
---0
+toggleDrills()
+move_block_pusher(1)
+toggleDrills()
 move_block_pusher(0)
-move_block_pusher(1)
+toggleDrills()
 
 
