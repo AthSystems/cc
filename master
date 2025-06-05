@@ -45,7 +45,7 @@ function waitForReply(keyword, timeout)
             print("✔ " .. msg)
 
             -- Only extract the number after "LVL"
-            local lvlStr = string.match(msg, "LVL(%d+)")
+            local lvlStr = string.match(msg, "(%d+)")
             local level = tonumber(lvlStr)
 
             return msg, level
