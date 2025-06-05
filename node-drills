@@ -2,21 +2,21 @@
 local modem = peripheral.find("modem") or error("No modem found", 0)
 rednet.open(peripheral.getName(modem))
 
-local nodeID = os.getComputerID()
 local controlledSide = "bottom"
 local name = "drillsNode"
-local master_id = 0
+local kw_forward = "forward"
+local kw_backward = "backward"
 
 print("Node " .. name .. " ready")
 
 while true do
     local senderID, msg = rednet.receive()
-    
-    if msg == "frontward" then
+    print("Message received : ".. msg)
+    if msg == kw_forward then
         redstone.setOutput(controlledSide, false)
         rednet.send(senderID, name .. ": Moving frontward.")
     
-    elseif msg == "backward" then
+    elseif msg == kw_backward then
         redstone.setOutput(controlledSide, true)
         rednet.send(senderID, name .. ": Moving backward.")
     end
