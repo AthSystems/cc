@@ -113,30 +113,55 @@ function reset()
 end
 
 -- === Farm Loop ===
-local function farm_cycle()
-    if manual_stop or drawer_stop then return end
+function farm_cycle()
+    if farm_running then return end
+    farm_running = true
 
-    logs("Starting farm cycle.")
+    logs("Starting new cycle.")
+    sleep(0.5)
+
     deploy()
     sleep(6)
 
-    while pusher_lvl < 7 do
-        move_block_pusher_timed(1,1)
-        sleep(1)
+    -- === Blind climb from LVL 0 to LVL 6 ===
+    local reached_lv6 = false
+
+    while not reached_lv6 do
+        local start = os.clock()
+        local timeout = 7
+
+        while os.clock() - start < timeout do
+            move_block_pusher_timed(1, 1)
+            sleep(0.5)
+
+            if pusher_lvl >= 6 then
+                reached_lv6 = true
+                break
+            end
+        end
+
+        if not reached_lv6 then
+            logs("LVL 6 not reached within 7s. Moving 1 block down and retrying...")
+            send(nodePusher, -1)  -- Blind move down
+            sleep(1.5)
+        end
     end
 
-    toggle_drills()
+    logs("Reached LVL 6. Beginning drill-assisted push to LVL 15.")
 
-    while pusher_lvl < 15 do
-        move_block_pusher(1)
+    -- === Drill + Push Loop ===
+    while pusher_lvl < 15 do 
+        move_block_pusher_timed(1, 1)
         toggle_drills()
+        sleep(0.5)
     end
 
-    logs("Cycle finished. Resetting...")
-    reset()
-    logs("Farm ready.")
-end
+    logs("Cycle finished. Resetting.")
 
+    reset()
+    logs("Farm ready for new cycle.")
+    farm_running = false
+end
 -- === Listener for Stop/Start ===
 local function listenControl()
     while true do
