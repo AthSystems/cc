@@ -8,8 +8,16 @@ local kw_drills_fb_frontward = "DFF"
 local kw_drills_backward = "backward"
 local kw_drills_fb_backward = "DFB"
 
+local nodePusher = 5
+local pusher_level = 0
+local kw_pusher_5m = "5m"
+local kw_pusher_fb_5m = "LVL5"
+local kw_pusher_1m = "1m"
+local kw_pusher_fb_1m = "LVL"
+local kw_pusher_fb_
+
 function send(id, message)
-    print("→ Sending to " .. id .. ": " .. message)
+    print("Sending to " .. id .. ": " .. message)
     rednet.send(id, message)
 end
 
@@ -17,10 +25,15 @@ function waitForReply(waitFor)
     while true do
         local _, reply = rednet.receive(5)
         if reply and string.find(reply, waitFor) then
-            print("✔ " .. reply)
+            print(reply)
             break
         end
     end
+end
+
+function sendAndWait(id, message, waitFor)
+    send(id, message)
+    waitForReplay(waitFor)
 end
 
 function stop()
@@ -37,6 +50,11 @@ function toggleDrills()
     end
     drill_state = not drill_state
 end
+
+
+function move_block_pusher(lvl)
+
+
 
 for i=1,10 do
     toggleDrills()
