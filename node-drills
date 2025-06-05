@@ -2,31 +2,46 @@
 local modem = peripheral.find("modem") or error("No modem found", 0)
 rednet.open(peripheral.getName(modem))
 
+-- === Setup ===
+local modem = peripheral.find("modem") or error("No modem found")
+rednet.open(peripheral.getName(modem))
+
+-- Variables
 local controlledSide = "bottom"
-local name = "drillsNode"
+local name = "drill_node"
+
+-- Keywords
 local kw_forward = "forward"
 local kw_backward = "backward"
 
+-- Protocols
+local ptc_control = "sky-control"
+local ptc_reply = "sky-reply"
+local ptc_lofs = "sky-logs"
+local ptc_status = "sky-status"
+
+-- Utilities
 function prompt(msg)
     print("[" .. os.date("%H:%M:%S") .. "] " .. msg)
 end
 
-prompt("Node " .. name .. " ready")
+prompt(name .. " ready")
 
+-- === Main Loop ===
 while true do
-    local senderID, msg = rednet.receive()
-    if msg == kw_forward then
-        prompt("Command received : ".. msg)
-        redstone.setOutput(controlledSide, false)
-        rednet.send(senderID, name .. ": Moving frontward.")
-    
-    elseif msg == kw_backward then
-        prompt("Command received : ".. msg)
-        redstone.setOutput(controlledSide, true)
-        rednet.send(senderID, name .. ": Moving backward.")
+    local senderID, msg, protocol = rednet.receive()
 
-    elseif msg == "ping" then
-        prompt("ping received. Sending pong")
-        rednet.send(senderID, "pong")
+    if protocol == ptc_status and msg == "ping" then
+        prompt("Ping received from", senderID)
+        rednet.send(senderID, "pong", ptc_reply)
+
+    elseif protocol == ptc_control then
+        if msg == "forward" then
+            redstone.setOutput("bottom", false)
+            rednet.broadcast("Drills : Moving forward", ptc_logs)
+        elseif msg == "backward" then
+            redstone.setOutput("bottom", true)
+            rednet.broadcast("Drills : Moving backward",, ptc_logs)
+        end
     end
 end
