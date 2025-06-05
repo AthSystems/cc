@@ -1,0 +1,61 @@
+-- === Setup ===
+local modem = peripheral.find("modem") or error("No modem found")
+rednet.open(peripheral.getName(modem))
+
+-- === Node IDs ===
+local nodeDrills = 0
+local nodePusher = 5
+local nodeDeploy = 20
+local nodeMonitor = 24
+-- === Communication Functions ===
+
+function logs(message)
+    print(message)
+    rednet.send(nodeMonitor, message)
+end
+
+function send(id, message)
+    local msg = "To " .. id .. ": " .. message
+    rednet.send(id, msg)
+    logs(msg)
+end
+
+
+-- === Reply Handlers ===
+
+-- Wait with timeout for reply
+function waitForReplyWithTimeout(keyword, timeout)
+    local start = os.clock()
+    while true do
+        local remaining = timeout - (os.clock() - start)
+        if remaining <= 0 then
+            logs("Timeout waiting for: " .. keyword)
+            return nil, nil
+        end
+
+        local _, msg = rednet.receive(remaining)
+        if msg and msg:find(keyword) then
+            logs(msg)
+            local lvlStr = string.match(msg, "LVL ?(%d+)")
+            local level = tonumber(lvlStr)
+            return msg, level
+        end
+    end
+end
+
+-- Send and wait with timeout
+function sendAndWaitWithTimeout(id, message, waitFor, timeout)
+    send(id, message)
+    local reply, level = waitForReplyWithTimeout(waitFor, timeout)
+    return reply, level
+end
+
+
+function ping(nodeId)
+  send(nodeId, "ping", "pong", 5)
+end
+
+ping(nodeDrills)
+ping(nodePusher)
+ping(nodeDeploy)
+ping(nodeMonitor)
