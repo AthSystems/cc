@@ -38,17 +38,12 @@ function send(id, message)
     rednet.send(id, message)
 end
 
-function waitForReply(keyword, timeout)
+function waitForReply(keyword)
     local start = timeout and os.clock() or nil
 
     while true do
-        local timeLeft = timeout and math.max(0.1, timeout - (os.clock() - start)) or nil
-        if timeLeft and timeLeft <= 0 then
-            print("⚠️ Timeout waiting for: " .. keyword)
-            return nil, nil
-        end
 
-        local _, msg = rednet.receive(timeLeft)
+        local _, msg = rednet.receive()
         if msg and msg:find(keyword) then
             print("✔ " .. msg)
             -- Extract number following 'LVL'
@@ -59,9 +54,9 @@ function waitForReply(keyword, timeout)
     end
 end
 
-function sendAndWait(id, message, waitFor, timeout)
+function sendAndWait(id, message, waitFor)
     send(id, message)
-    local reply, level = waitForReply(waitFor, timeout)
+    local reply, level = waitForReply(waitFor)
     return reply, level
 end
 
@@ -78,7 +73,7 @@ end
 
 -- === Pusher Control ===
 
-function move_block_pusher(target_lvl, timeout)
+function move_block_pusher(target_lvl)
     if target_lvl == 1 then
         if pusher_lvl >= 5 and pusher_lvl <= 15 then
             send(nodePusher, kw_pusher_1m)
