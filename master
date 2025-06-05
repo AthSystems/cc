@@ -11,6 +11,7 @@ local pusher_lvl = 0
 local nodeDrills = 0
 local nodePusher = 5
 local nodeDeploy = 20
+local nodeMonitor = 24
 
 -- === Drill Keywords ===
 local kw_drills_forward     = "forward"
@@ -33,9 +34,15 @@ local kw_deploy_fb  = "RD"
 
 -- === Communication Functions ===
 
+function logs(message)
+    print(msg)
+    rednet.sent(nodeMonitor, message)
+end
+
 function send(id, message)
-    print("→ Sending to " .. id .. ": " .. message)
-    rednet.send(id, message)
+    local msg = "To " .. id .. ": " .. message
+    rednet.send(id, msg)
+    logs(msg)
 end
 
 
@@ -49,7 +56,7 @@ function waitForReply(keyword)
     while true do
         local _, msg = rednet.receive()
         if msg and msg:find(keyword) then
-            print("✔ " .. msg)
+            logs(msg)
             local lvlStr = string.match(msg, "LVL ?(%d+)")
             local level = tonumber(lvlStr)
             return msg, level
@@ -63,13 +70,13 @@ function waitForReplyWithTimeout(keyword, timeout)
     while true do
         local remaining = timeout - (os.clock() - start)
         if remaining <= 0 then
-            print("⚠️ Timeout waiting for: " .. keyword)
+            logs("Timeout waiting for: " .. keyword)
             return nil, nil
         end
 
         local _, msg = rednet.receive(remaining)
         if msg and msg:find(keyword) then
-            print("✔ " .. msg)
+            logs(msg)
             local lvlStr = string.match(msg, "LVL ?(%d+)")
             local level = tonumber(lvlStr)
             return msg, level
@@ -206,6 +213,8 @@ end
 function farm_cycle()
     if farm_running then return end
 
+    logs("Starting new cycle.")
+
     deploy()
     sleep(6)
 
@@ -215,14 +224,20 @@ function farm_cycle()
     end
 
     toggle_drills()
+
     while pusher_lvl < 15 do 
         move_block_pusher(1)
         toggle_drills()
     end
 
+    logs("Cycle finished. Resetting.")
+
     reset()
+
+    logs("Farm ready for new cycle.")
 end
 
 -- === Start ===
+logs("Starting farm.")
 sleep(5)
 farm_cycle()
