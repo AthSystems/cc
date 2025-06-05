@@ -15,7 +15,7 @@ function move_plate(lvl)
     redstone.setOutput("right", false)
     redstone.setOutput("bottom", false)
     redstone.setOutput("left", true)
-  elseif lvl = 1 then
+  elseif lvl == 1 then
     redstone.setOutput("left", false)
     redstone.setOutput("right", false)
     redstone.setOutput("bottom", true)
