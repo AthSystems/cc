@@ -16,6 +16,7 @@ function move_plate(length, speed)
   p.move(length, speed)
 end
 
+move_plate(15,-2)
 
 while true do
   local senderID, msg = rednet.receive()
