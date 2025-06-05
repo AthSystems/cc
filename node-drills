@@ -5,6 +5,7 @@ rednet.open(peripheral.getName(modem))
 local nodeID = os.getComputerID()
 local controlledSide = "bottom"
 local name = "drillsNode"
+local master_id = 0
 
 print("Node " .. name .. " ready")
 
