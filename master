@@ -10,7 +10,7 @@ local pusher_lvl = 0
 -- === Node IDs ===
 local nodeDrills = 0
 local nodePusher = 5
-local nodeDeploy = 18
+local nodeDeploy = 20
 
 -- === Drill Keywords ===
 local kw_drills_forward     = "forward"
