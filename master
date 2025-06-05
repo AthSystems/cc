@@ -118,7 +118,7 @@ local function farm_cycle()
     sleep(6)
 
     while pusher_lvl < 7 do
-        move_block_pusher(1)
+        move_block_pusher_timed(1,1)
         sleep(1)
     end
 
