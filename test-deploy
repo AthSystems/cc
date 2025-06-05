@@ -8,7 +8,7 @@ local speed = max_speed * direction_mod
 
 function move(length, d)
     gearshift.move(length, d*speed)
-    print("["os.date("%H:%M:%S") .. "] " .. "Moving of " .. tostring(length) .. " | direction : " .. tostring(d))
+    print("[" .. os.date("%H:%M:%S") .. "] " .. "Moving of " .. tostring(length) .. " | direction : " .. tostring(d))
     while gearshift.isRunning() do
         sleep(0.1)
     end
