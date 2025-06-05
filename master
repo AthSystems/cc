@@ -2,243 +2,193 @@
 local modem = peripheral.find("modem") or error("No modem found")
 rednet.open(peripheral.getName(modem))
 
--- === Global State ===
-local farm_running = false
-local drill_state = true
-local pusher_lvl = 0
+-- === Protocols ===
+local ptc_control = "sky-control"
+local ptc_reply   = "sky-reply"
+local ptc_logs    = "sky-logs"
+local ptc_status  = "sky-status"
 
 -- === Node IDs ===
-local nodeDrills = 0
-local nodePusher = 5
-local nodeDeploy = 20
-local nodeMonitor = 24
+local nodeDrills  = 0
+local nodePusher  = 5
+local nodeDeploy  = 20
+local nodeDrawer  = 23
 
--- === Drill Keywords ===
+-- === State ===
+local drill_state = true
+local pusher_lvl = 0
+local farm_running = false
+local manual_stopped = false
+local drawer_stopped = false
+
+-- === Keywords ===
 local kw_drills_forward     = "forward"
 local kw_drills_fb_forward  = "DFF"
 local kw_drills_backward    = "backward"
 local kw_drills_fb_backward = "DFB"
 
--- === Pusher Keywords ===
-local kw_pusher_5m      = 5
-local kw_pusher_fb_5m   = "LVL 5"
 local kw_pusher_1m      = 1
-local kw_pusher_fb_1m   = "LVL"
+local kw_pusher_5m      = 5
 local kw_pusher_ground  = -15
+local kw_pusher_fb_1m   = "LVL"
+local kw_pusher_fb_5m   = "LVL 5"
 local kw_pusher_fb_ground = "LVL 0"
 local kw_pusher_fb_top  = "LVL 15"
 
--- === Deploy Keywords ===
 local kw_deploy     = "deploy"
 local kw_deploy_fb  = "RD"
 
--- === Communication Functions ===
-
-function logs(message)
-    print(message)
-    rednet.send(nodeMonitor, message)
+-- === Utilities ===
+local function log(msg)
+    print("[" .. os.date("%H:%M:%S") .. "] " .. msg)
+    rednet.broadcast({ source = "Master", message = msg }, ptc_logs)
 end
 
-function send(id, message)
-    local msg = "To " .. id .. ": " .. message
-    rednet.send(id, msg)
-    logs(msg)
+local function send(id, msg)
+    rednet.send(id, msg, ptc_control)
 end
 
-
-
-
-
--- === Reply Handlers ===
-
--- Wait indefinitely for reply
-function waitForReply(keyword)
-    while true do
-        local _, msg = rednet.receive()
-        if msg and msg:find(keyword) then
-            logs(msg)
-            local lvlStr = string.match(msg, "LVL ?(%d+)")
-            local level = tonumber(lvlStr)
-            return msg, level
-        end
-    end
-end
-
--- Wait with timeout for reply
-function waitForReplyWithTimeout(keyword, timeout)
+local function sendAndWait(id, msg, keyword, timeout)
+    send(id, msg)
     local start = os.clock()
     while true do
-        local remaining = timeout - (os.clock() - start)
-        if remaining <= 0 then
-            logs("Timeout waiting for: " .. keyword)
+        local remaining = timeout and (timeout - (os.clock() - start)) or nil
+        if timeout and remaining <= 0 then
+            log("Timeout waiting for: " .. keyword)
             return nil, nil
         end
-
-        local _, msg = rednet.receive(remaining)
-        if msg and msg:find(keyword) then
-            logs(msg)
-            local lvlStr = string.match(msg, "LVL ?(%d+)")
-            local level = tonumber(lvlStr)
-            return msg, level
+        local _, response, _ = rednet.receive(ptc_reply, remaining)
+        if type(response) == "string" and response:find(keyword) then
+            log(response)
+            local lvlStr = string.match(response, "LVL ?(%d+)")
+            return response, tonumber(lvlStr)
         end
     end
 end
 
--- Send and wait indefinitely
-function sendAndWait(id, message, waitFor)
-    send(id, message)
-    local reply, level = waitForReply(waitFor)
-    return reply, level
-end
-
--- Send and wait with timeout
-function sendAndWaitWithTimeout(id, message, waitFor, timeout)
-    send(id, message)
-    local reply, level = waitForReplyWithTimeout(waitFor, timeout)
-    return reply, level
-end
-
-
-
-
-
--- === Drill Control ===
-
-function move_drills(reverse)
-    if reverse then    
-        sendAndWait(nodeDrills,kw_drills_backward, kw_drills_fb_backward)
-    else 
-        sendAndWait(nodeDrills,kw_drills_forward, kw_drills_fb_forward)
+-- === Node Pings ===
+local function pingAllNodes()
+    local nodes = { nodeDrills, nodePusher, nodeDeploy, nodeDrawer }
+    for _, id in ipairs(nodes) do
+        send(id, "ping")
+        local ok = false
+        local start = os.clock()
+        while os.clock() - start < 3 do
+            local sender, msg, protocol = rednet.receive(ptc_reply, 0.5)
+            if sender == id and msg == "pong" then
+                log("Ping OK: Node " .. id)
+                ok = true
+                break
+            end
+        end
+        if not ok then
+            log("Ping FAIL: Node " .. id)
+        end
     end
 end
 
-function toggle_drills()
+-- === Component Control ===
+local function move_drills(reverse)
+    if reverse then
+        sendAndWait(nodeDrills, kw_drills_backward, kw_drills_fb_backward, 3)
+    else
+        sendAndWait(nodeDrills, kw_drills_forward, kw_drills_fb_forward, 3)
+    end
+end
+
+local function toggle_drills()
     move_drills(not drill_state)
     drill_state = not drill_state
 end
 
+local function move_pusher_timed(target, timeout)
+    if target == 1 and pusher_lvl <= 15 then
+        local fb = (pusher_lvl == 14) and kw_pusher_fb_top or kw_pusher_fb_1m
+        _, new_lvl = sendAndWait(nodePusher, kw_pusher_1m, fb, timeout)
+        if new_lvl then pusher_lvl = new_lvl end
 
+    elseif target == 5 and pusher_lvl == 0 then
+        _, new_lvl = sendAndWait(nodePusher, kw_pusher_5m, kw_pusher_fb_5m, timeout)
+        if new_lvl then pusher_lvl = new_lvl end
 
-
--- === Pusher Control ===
-
-function move_block_pusher_timed(target_lvl, timeout)
-    if target_lvl == 1 then
-        if pusher_lvl <= 15 then
-            send(nodePusher, kw_pusher_1m)
-
-            if pusher_lvl == 14 then
-                _, new_lvl = waitForReplyWithTimeout(kw_pusher_fb_top, timeout)
-            else
-                _, new_lvl = waitForReplyWithTimeout(kw_pusher_fb_1m, timeout)
-            end
-
-            if new_lvl then
-                pusher_lvl = new_lvl
-                print("Pusher Level: " .. pusher_lvl)
-            end
-        end
-
-    elseif target_lvl == 5 then
-        if pusher_lvl == 0 then
-            _, new_lvl = sendAndWaitWithTimeout(nodePusher, kw_pusher_5m, kw_pusher_fb_5m, timeout)
-            if new_lvl then
-                pusher_lvl = new_lvl
-                print("Pusher Level: " .. pusher_lvl)
-            end
-        end
-
-    elseif target_lvl == 0 then
-        if pusher_lvl == 15 then
-            _, new_lvl = sendAndWaitWithTimeout(nodePusher, kw_pusher_ground, kw_pusher_fb_ground, timeout)
-            if new_lvl then
-                pusher_lvl = new_lvl
-                print("Pusher Level: " .. pusher_lvl)
-            end
-        end
+    elseif target == 0 and pusher_lvl == 15 then
+        _, new_lvl = sendAndWait(nodePusher, kw_pusher_ground, kw_pusher_fb_ground, timeout)
+        if new_lvl then pusher_lvl = new_lvl end
     end
 end
 
-
-function move_block_pusher(target_lvl)
-    if target_lvl == 1 then
-        if pusher_lvl <= 15 then
-            send(nodePusher, kw_pusher_1m)
-
-            if pusher_lvl == 14 then
-                _, new_lvl = waitForReply(kw_pusher_fb_top)
-            else
-                _, new_lvl = waitForReply(kw_pusher_fb_1m)
-            end
-
-            if new_lvl then
-                pusher_lvl = new_lvl
-                print("Pusher Level: " .. pusher_lvl)
-            end
-        end
-
-    elseif target_lvl == 5 then
-        if pusher_lvl == 0 then
-            _, new_lvl = sendAndWait(nodePusher, kw_pusher_5m, kw_pusher_fb_5m)
-            if new_lvl then
-                pusher_lvl = new_lvl
-                print("Pusher Level: " .. pusher_lvl)
-            end
-        end
-
-    elseif target_lvl == 0 then
-        if pusher_lvl == 15 then
-            _, new_lvl = sendAndWait(nodePusher, kw_pusher_ground, kw_pusher_fb_ground)
-            if new_lvl then
-                pusher_lvl = new_lvl
-                print("Pusher Level: " .. pusher_lvl)
-            end
-        end
-    end
+local function move_pusher(target)
+    move_pusher_timed(target, 2)
 end
 
--- === Deploy Control ===
-
-function deploy()
-    sendAndWait(nodeDeploy, kw_deploy, kw_deploy_fb)
+local function deploy()
+    sendAndWait(nodeDeploy, kw_deploy, kw_deploy_fb, 5)
 end
 
--- === Farm Sequence ===
-
-function reset()
-    move_pusher_block(0)
+local function reset_all()
+    log("Resetting all components.")
+    move_pusher(0)
     move_drills(true)
+    log("Reset complete.")
 end
 
-function farm_cycle()
-    if farm_running then return end
+-- === Cycle ===
+local function farm_cycle()
+    if farm_running or manual_stopped or drawer_stopped then return end
+    farm_running = true
 
-    logs("Starting new cycle.")
-    sleep(0.5)
-
+    log("Starting cycle")
     deploy()
     sleep(6)
 
     while pusher_lvl < 7 do
-        move_block_pusher_timed(1,1)
+        move_pusher_timed(1, 1)
         sleep(1)
     end
 
     toggle_drills()
 
-    while pusher_lvl < 15 do 
-        move_block_pusher(1)
+    while pusher_lvl < 15 do
+        move_pusher(1)
         toggle_drills()
     end
 
-    logs("Cycle finished. Resetting.")
+    log("Cycle complete. Resetting.")
+    reset_all()
+    log("Ready for next cycle.")
+    farm_running = false
+end
 
-    reset()
-
-    logs("Farm ready for new cycle.")
+-- === Stop Handling ===
+local function stop_listener()
+    while true do
+        local _, msg, protocol = rednet.receive(ptc_control)
+        if msg == "stop" then
+            manual_stopped = true
+            log("Manual stop requested.")
+        elseif msg == "start" then
+            manual_stopped = false
+            drawer_stopped = false
+            log("Manual restart requested.")
+        elseif type(msg) == "table" and msg[1] == "stop" then
+            drawer_stopped = true
+            log("Drawer full, stopping after this cycle.")
+        elseif type(msg) == "table" and msg[1] == "continue" then
+            drawer_stopped = false
+            log("Drawer resumed, will continue after current stop.")
+        end
+    end
 end
 
 -- === Start ===
-logs("Starting farm.")
-sleep(5)
-farm_cycle()
+log("Master initializing.")
+pingAllNodes()
+reset_all()
+log("System initialized. Ready.")
+
+parallel.waitForAny(stop_listener, function()
+    while true do
+        farm_cycle()
+        sleep(1)
+    end
+end)
