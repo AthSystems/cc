@@ -206,9 +206,9 @@ function farm_cycle()
     deploy()
     sleep(6)
 
-    move_block_pusher_timed(5,3)  -- Move from 0m to 5m
-    while pusher_lvl < 5 do
-        move_block_pusher_timed(1,3)
+    while pusher_lvl < 7 do
+        move_block_pusher_timed(1,1)
+        sleep(1)
     end
 
     toggleDrills()
