@@ -1,74 +1,192 @@
 -- === Setup ===
-local drawer_side = "back"
-local modem = peripheral.find("modem") or error("No modem", 0)
+local modem = peripheral.find("modem") or error("No modem found")
 rednet.open(peripheral.getName(modem))
-local drawer = peripheral.wrap(drawer_side) or error("No drawer found", 0)
 
--- === Configuration ===
-local master_id = 1
-local monitor_id = 24
-local node_name = "drawerNode"
-local slot = 1
-local threshold_stop = 90
-local threshold_resume = 10
+-- === Node IDs ===
+local nodeDrills = 0
+local nodePusher = 5
+local nodeDeploy = 20
+local nodeDrawer = 23
+local nodeMonitor = 24
+
+-- === Protocols ===
+local ptc_control = "sky-control"
+local ptc_reply = "sky-reply"
 local ptc_logs = "sky-logs"
 local ptc_status = "sky-status"
 
-local auto_stopped = false
+-- === Keywords ===
+local kw_drills_forward     = "forward"
+local kw_drills_backward    = "backward"
+local kw_deploy             = "deploy"
 
--- === Utilities ===
-local function log(msg)
+-- === State ===
+local drill_state = true
+local pusher_lvl = 0
+local manual_stop = true
+local drawer_stop = false
+
+-- === Logging ===
+local function logs(msg)
     print("[" .. os.date("%H:%M:%S") .. "] " .. msg)
-    rednet.send(monitor_id, msg, ptc_logs)
+    rednet.send(nodeMonitor, msg, ptc_logs)
 end
 
-local function getDrawerData()
-    local item = drawer.getItemDetail(slot)
-    if not item then return nil end
-    local name = item.displayName
-    local count = item.count
-    local limit = drawer.getItemLimit(slot)
-    local percent = (count / limit) * 100
-    return {
-        source = node_name,
-        item = name,
-        count = count,
-        limit = limit,
-        percent = percent,
-        status = percent >= threshold_stop and "NEAR FULL" or "NORMAL"
-    }
+-- === Messaging Utilities ===
+local function send(id, msg)
+    rednet.send(id, msg, ptc_control)
 end
 
--- === Drawer Check Loop ===
-local function monitorDrawer()
+local function waitForReply(keyword)
     while true do
-        local data = getDrawerData()
-        if data then
-            if data.percent >= threshold_stop and not auto_stopped then
-                rednet.send(master_id, "stop", ptc_status)
-                log("Threshold exceeded: sending STOP")
-                auto_stopped = true
-            elseif data.percent <= threshold_resume and auto_stopped then
-                rednet.send(master_id, "start", ptc_status)
-                log("Below resume threshold: sending START")
-                auto_stopped = false
-            end
-            rednet.send(monitor_id, data, ptc_logs)
+        local _, msg = rednet.receive()
+        if msg and msg:find(keyword) then
+            logs(msg)
+            local lvl = tonumber(string.match(msg, "LVL ?(%d+)"))
+            return msg, lvl
         end
+    end
+end
+
+local function sendAndWait(id, msg, keyword)
+    send(id, msg)
+    return waitForReply(keyword)
+end
+
+local function pingNode(id, timeout)
+    logs("Pinging node: " .. id)
+    rednet.send(id, "ping", ptc_status)
+    local start = os.clock()
+    while os.clock() - start < timeout do
+        local sender, message, protocol = rednet.receive(ptc_reply, timeout)
+        if sender == id and message == "pong" then
+            logs("Node " .. id .. " responded.")
+            return true
+        end
+    end
+    logs("Node " .. id .. " did not respond.")
+    return false
+end
+
+-- === Controls ===
+local function move_drills(reverse)
+    if reverse then
+        sendAndWait(nodeDrills, kw_drills_backward, "DFB")
+    else
+        sendAndWait(nodeDrills, kw_drills_forward, "DFF")
+    end
+end
+
+local function toggle_drills()
+    move_drills(not drill_state)
+    drill_state = not drill_state
+end
+
+local function deploy()
+    sendAndWait(nodeDeploy, kw_deploy, "RD")
+end
+
+local function move_block_pusher(target_lvl)
+    if target_lvl == 5 and pusher_lvl == 0 then
+        _, new = sendAndWait(nodePusher, 5, "LVL 5")
+        pusher_lvl = new or pusher_lvl
+    elseif target_lvl == 1 and pusher_lvl <= 14 then
+        send(nodePusher, 1)
+        if pusher_lvl == 14 then
+            _, new = waitForReply("LVL 15")
+        else
+            _, new = waitForReply("LVL")
+        end
+        pusher_lvl = new or pusher_lvl
+    elseif target_lvl == 0 and pusher_lvl == 15 then
+        _, new = sendAndWait(nodePusher, -15, "LVL 0")
+        pusher_lvl = new or pusher_lvl
+    end
+end
+
+local function reset()
+    move_block_pusher(0)
+    move_drills(true)
+end
+
+-- === Farm Loop ===
+local function farm_cycle()
+    if manual_stop or drawer_stop then return end
+
+    logs("Starting farm cycle.")
+    deploy()
+    sleep(6)
+
+    while pusher_lvl < 7 do
+        move_block_pusher(1)
         sleep(1)
     end
+
+    toggle_drills()
+
+    while pusher_lvl < 15 do
+        move_block_pusher(1)
+        toggle_drills()
+    end
+
+    logs("Cycle finished. Resetting...")
+    reset()
+    logs("Farm ready.")
 end
 
--- === Ping Handler ===
-local function listen()
+-- === Listener for Stop/Start ===
+local function listenControl()
     while true do
-        local id, msg, protocol = rednet.receive()
-        if msg == "ping" then
-            rednet.send(id, "pong", "sky-reply")
+        local sender, msg, protocol = rednet.receive()
+        if protocol == ptc_control then
+            if msg == "stop" then
+                if sender == nodeMonitor then
+                    manual_stop = true
+                    logs("Manual stop triggered.")
+                elseif sender == nodeDrawer then
+                    drawer_stop = true
+                    logs("Drawer triggered stop.")
+                end
+            elseif msg == "start" then
+                if sender == nodeMonitor then
+                    manual_stop = false
+                    logs("Manual start triggered.")
+                elseif sender == nodeDrawer then
+                    drawer_stop = false
+                    logs("Drawer resume triggered.")
+                end
+            end
         end
     end
 end
 
--- === Launch ===
-log("Drawer node ready.")
-parallel.waitForAll(monitorDrawer, listen)
+-- === Wait Manual Start ===
+local function waitManualStart()
+    logs("Waiting for START button on monitor...")
+    while manual_stop do
+        sleep(0.5)
+    end
+end
+
+-- === Init ===
+logs("Pinging all nodes...")
+for _, id in ipairs({ nodeDrills, nodePusher, nodeDeploy, nodeDrawer }) do
+    pingNode(id, 4)
+end
+
+logs("Resetting system...")
+reset()
+
+-- === Launch Main ===
+parallel.waitForAny(
+    listenControl,
+    function()
+        waitManualStart()
+        while true do
+            if not manual_stop and not drawer_stop then
+                farm_cycle()
+            end
+            sleep(0.5)
+        end
+    end
+)
