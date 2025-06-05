@@ -1,75 +1,83 @@
-
+-- === Setup ===
 local drawer_side = "back"
-local threshold = 90
-
-
-local drawer = peripheral.wrap(drawer_side) or error ("No drawer found at " .. drawer_side, 0)
-
-local modem = peripheral.find("modem") or error("No modem", 0)
+local drawer = peripheral.wrap(drawer_side) or error("No drawer at " .. drawer_side)
+local modem = peripheral.find("modem") or error("No modem found")
 rednet.open(peripheral.getName(modem))
 
+-- === Configuration ===
+local node_name = "drawer_node"
 local master_id = 1
-local monitor_id = 100
-local node_name = "drawerNode"
-local slot_check = 1
+local threshold = 90  -- Percent fill to trigger stop
+local check_interval = 1
 
+-- === Protocols ===
+local ptc_control = "sky-control"
+local ptc_status  = "sky-status"
+local ptc_reply   = "sky-reply"
+local ptc_logs    = "sky-logs"
 
-function prompt(msg)
+-- === Utilities ===
+local function prompt(msg)
     print("[" .. os.date("%H:%M:%S") .. "] " .. msg)
 end
 
-function getItemName()
-  return drawer.getItemDetail(1)["displayName"]
+local function log(msg)
+    prompt(msg)
+    rednet.broadcast("[" .. node_name .. "] : " .. msg, ptc_logs)
 end
 
-function getCount()
-  return drawer.getItemDetail(1)["count"]
+-- === Drawer Info ===
+local function getItemDetail()
+    return drawer.getItemDetail(1)
 end
 
-function getItemLimit()
-  return drawer.getItemLimit(1)
+local function getPercentFill()
+    local detail = getItemDetail()
+    return detail and (detail.count / drawer.getItemLimit(1)) * 100 or 0
 end
 
-function getPercentFill()
-  local limit = drawer.getItemLimit(1)
-  local count = drawer.getItemDetail(1)["count"]
-  return (count/limit) * 100
+local function getDrawerData()
+    local detail = getItemDetail()
+    return {
+        source = node_name,
+        item = detail and detail.displayName or "empty",
+        count = detail and detail.count or 0,
+        max = drawer.getItemLimit(1),
+        percent = getPercentFill()
+    }
 end
 
-function getDrawerData()
-  return {getItemName(), getPercentFill(), getCount(), getItemLimit()}
-end
+-- === Main Monitoring Loop ===
+local function main_loop()
+    while true do
+        local data = getDrawerData()
 
-prompt("Node ".. node_name .. " : ready.")
+        -- Send status message to monitor
+        rednet.broadcast(data, ptc_status)
 
+        -- Notify master if threshold exceeded
+        if data.percent >= threshold then
+            rednet.send(master_id, { action = "stop", source = node_name, percent = data.percent }, ptc_control)
+            log("Threshold exceeded (" .. math.floor(data.percent) .. "%) → Sent STOP")
+        else
+            rednet.send(master_id, { action = "continue", source = node_name, percent = data.percent }, ptc_control)
+        end
 
-function main_loop()
-  while true do 
-    if getPercentFill() >= threshold then
-      rednet.send(master_id, {"stop", getPercentFill()})
-    else 
-      rednet.send(master_id, {"continue", getPercentFill()})
+        sleep(check_interval)
     end
-  
-    rednet.send(monitor_id, getDrawerData())
-    prompt(table.unpack(getDrawerData()))
-    sleep(1)
-  
-  end
 end
 
-function listening()
-  while true do
-    local senderID, msg = rednet.receive()
-    if msg == "ping" then
-        prompt("ping received. Sending pong")
-        rednet.send(senderID, "pong")
+-- === Respond to Ping ===
+local function listen_ping()
+    while true do
+        local senderID, msg, proto = rednet.receive()
+        if proto == ptc_status and msg == "ping" then
+            prompt("Ping received from " .. senderID)
+            rednet.send(senderID, "pong", ptc_reply)
+        end
     end
-  end
 end
 
-
-parallel.waitForAll(listening, main_loop)
-
-
-
+-- === Launch ===
+log("Ready. Monitoring drawer on side: " .. drawer_side)
+parallel.waitForAll(main_loop, listen_ping)
