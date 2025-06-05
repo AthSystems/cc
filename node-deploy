@@ -11,10 +11,11 @@ local max_speed = 2
 local direction_mod = -1
 local speed = max_speed * direction_mod
 
-print("Node " .. name .. " ready")
+print("[" .. os.date("%H:%M:%S") .. "] " .. "Node " .. name .. " ready")
 
 function move(length, d)
     gearshift.move(length, d*speed)
+    print("[" .. os.date("%H:%M:%S") .. "] " .. "Moving of ".. length .. " | direction : " .. tostring(d))
     while gearshift.isRunning() do
         sleep(0.1)
     end
@@ -35,7 +36,9 @@ while true do
     local senderID, msg = rednet.receive()
     
     if msg == "deploy" then
+        print("[" .. os.date("%H:%M:%S") .. "] " .. msg)
         deploy()
         rednet.send(senderID, "Deploy done. [RD]")
+        print("[" .. os.date("%H:%M:%S") .. "] " .. "Deploy done. [RD]")
    end
 end
