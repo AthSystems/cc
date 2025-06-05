@@ -57,9 +57,9 @@ function move_block_pusher(lvl)
         if pusher_lvl >= 5 and pusher_lvl <= 15 then
             send(nodePusher, kw_pusher_1m)
             if pusher_lvl == 14 then
-                waitFor(kw_pusher_fb_top)
+                waitForReply(kw_pusher_fb_top)
             else
-                waitFor(kw_pusher_fb_1m)
+                waitForReply(kw_pusher_fb_1m)
             end
             pusher_lvl = pusher_lvl + 1
         end
