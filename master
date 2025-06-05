@@ -27,13 +27,15 @@ function stop()
     print("Stopping farm")
 end
 
-fun toggleDrills()
+function toggleDrills()
     if drill_state then
         send(nodeDrills, kw_drills_backward)
         waitForReplay(kw_drills_fb_backward)
     else 
         send(nodeDrills, kw_drills_frontward)
         waitForReply(kw_drills_fb_frontward)
+    end
+    drill_state = not drill_state
 end
 
 for i=1,10 do
