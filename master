@@ -25,8 +25,8 @@ end
 
 
 send(nodeDrills,"backward")
-waitForReply("drills_full_backward")
+waitForReply("DFB")
 send(nodeDrills,"frontward")
-waitForReply("drills_full_frontward")
+waitForReply("DFF")
 send(nodeDrills,"backward")
-waitForReply("drills_full_backward")
+waitForReply("DFB")
