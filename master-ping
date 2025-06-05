@@ -15,9 +15,8 @@ function logs(message)
 end
 
 function send(id, message)
-    local msg = "To " .. id .. ": " .. message
     rednet.send(id, msg)
-    logs(msg)
+    logs("To " .. id .. ": " .. message)
 end
 
 
@@ -58,4 +57,3 @@ end
 ping(nodeDrills)
 ping(nodePusher)
 ping(nodeDeploy)
-ping(nodeMonitor)
