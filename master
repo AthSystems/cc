@@ -119,7 +119,7 @@ end
 
 function move_block_pusher_timed(target_lvl, timeout)
     if target_lvl == 1 then
-        if pusher_lvl >= 5 and pusher_lvl <= 15 then
+        if pusher_lvl <= 15 then
             send(nodePusher, kw_pusher_1m)
 
             if pusher_lvl == 14 then
@@ -157,7 +157,7 @@ end
 
 function move_block_pusher(target_lvl)
     if target_lvl == 1 then
-        if pusher_lvl >= 5 and pusher_lvl <= 15 then
+        if pusher_lvl <= 15 then
             send(nodePusher, kw_pusher_1m)
 
             if pusher_lvl == 14 then
