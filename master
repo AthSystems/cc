@@ -214,6 +214,7 @@ function farm_cycle()
     if farm_running then return end
 
     logs("Starting new cycle.")
+    sleep(0.5)
 
     deploy()
     sleep(6)
