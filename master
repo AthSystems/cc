@@ -74,27 +74,33 @@ end
 
 
 function move_block_pusher(lvl, timeout)
-    print("Pusher level from: " .. pusher_lvl)
 
     if lvl == 1 then
         if pusher_lvl >= 5 and pusher_lvl <= 15 then
             send(nodePusher, kw_pusher_1m)
             if pusher_lvl == 14 then
-                pusher_lvl = waitForReply(kw_pusher_fb_top)
+                msg, lvl = waitForReply(kw_pusher_fb_top)
+                print("Level Debug : " .. tostring(lvl)
+                pusher_lvl = lvl
             else
                 pusher_lvl = waitForReply(kw_pusher_fb_1m)
+                print("Level Debug : " .. tostring(lvl)
+                pusher_lvl = lvl
             end
-            pusher_lvl = pusher_lvl + 1
         end
 
     elseif lvl == 5 then
         if pusher_lvl == 0 then
-            pusher_lvl = sendAndWait(nodePusher, kw_pusher_5m, kw_pusher_fb_5m, timeout)
+            msg, lvl  = sendAndWait(nodePusher, kw_pusher_5m, kw_pusher_fb_5m)
+            print("Level Debug : " .. tostring(lvl)
+            pusher_lvl = lvl
         end
 
     elseif lvl == 0 then
         if pusher_lvl == 15 then
-            pusher_lvl = sendAndWait(nodePusher, kw_pusher_ground, kw_pusher_fb_ground)
+            msg, lvl  = sendAndWait(nodePusher, kw_pusher_ground, kw_pusher_fb_ground)
+            print("Level Debug : " .. tostring(lvl)
+            pusher_lvl = lvl
         end
     end
 
@@ -111,18 +117,19 @@ function farm_cycle()
     if not farm_running then 
 
         deploy()
-        sleep(4)
+        sleep(6)
 
         -- Start moving up
-        move_block_pusher(5,1)
-        while pusher_lvl < 7 do
-            move_block_pusher(1)
-            toggleDrills()
-        end
+        move_block_pusher(5)
+
+        --while pusher_lvl < 7 do
+        --  move_block_pusher(1)
+        --    toggleDrills()
+        --end
 
         -- Start drilling
         toggleDrills()
-        while pusher_lvl < 15do 
+        while pusher_lvl < 15 do 
             move_block_pusher(1)
             toggleDrills()
         end
