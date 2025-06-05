@@ -13,7 +13,7 @@ local nodePusher = 5
 local nodeDeploy = 18
 
 -- === Drill Keywords ===
-local kw_drills_forward     = "frontward"
+local kw_drills_forward     = "forward"
 local kw_drills_fb_forward  = "DFF"
 local kw_drills_backward    = "backward"
 local kw_drills_fb_backward = "DFB"
@@ -95,25 +95,23 @@ end
 
 
 
-
-
-
-
-
-
-
-
-
 -- === Drill Control ===
 
-function toggleDrills()
-    if drill_state then
-        sendAndWait(nodeDrills, kw_drills_backward, kw_drills_fb_backward)
-    else
-        sendAndWait(nodeDrills, kw_drills_forward, kw_drills_fb_forward)
+function move_drills(reverse)
+    if reverse then    
+        sendAndWait(nodeDrills,kw_drills_backward, kw_drills_fb_backward)
+    else 
+        sendAndWait(nodeDrills,kw_drills_forward, kw_drills_fb_forward)
     end
+end
+
+function toggle_drills()
+    move_drills(not drill_state)
     drill_state = not drill_state
 end
+
+
+
 
 -- === Pusher Control ===
 
@@ -200,6 +198,11 @@ end
 
 -- === Farm Sequence ===
 
+function reset()
+    move_pusher_block(0)
+    move_drills(true)
+end
+
 function farm_cycle()
     if farm_running then return end
 
@@ -211,14 +214,13 @@ function farm_cycle()
         sleep(0.5)
     end
 
-    toggleDrills()
+    toggle_drills()
     while pusher_lvl < 15 do 
         move_block_pusher(1)
-        toggleDrills()
+        toggle_drills()
     end
 
-    move_block_pusher(0)  -- Reset to ground
-    toggleDrills()
+    reset
 end
 
 -- === Start ===
