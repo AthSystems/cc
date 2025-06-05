@@ -1,0 +1,55 @@
+-- === Setup ===
+local modem = peripheral.find("modem") or error("No modem found")
+rednet.open(peripheral.getName(modem))
+
+-- === Node IDs ===
+local nodeDrills = 0
+local nodePusher = 5
+local nodeDeploy = 20
+local ptc_control = "sky-control"
+local ptc_logs = "sky-logs"
+
+-- === State ===
+local drill_state = false
+
+-- === Helpers ===
+local function log(msg)
+    print(msg)
+    rednet.broadcast(msg, ptc_logs)
+end
+
+local function send(id, msg)
+    rednet.send(id, msg, ptc_control)
+    log("Sent to " .. id .. ": " .. tostring(msg))
+end
+
+-- === Actions ===
+local actions = {
+    { key = "1", label = "Drill Forward",  func = function() send(nodeDrills, "forward") end },
+    { key = "2", label = "Drill Backward", func = function() send(nodeDrills, "backward") end },
+    { key = "3", label = "Drill Toggle",   func = function()
+        send(nodeDrills, drill_state and "backward" or "forward")
+        drill_state = not drill_state
+    end },
+    { key = "4", label = "Deploy",         func = function() send(nodeDeploy, "deploy") end },
+    { key = "5", label = "Plate +1",       func = function() send(nodePusher, 1) end },
+    { key = "6", label = "To Ground",      func = function() send(nodePusher, -15) end },
+    { key = "7", label = "To Top",         func = function() send(nodePusher, 15) end },
+    { key = "q", label = "Quit",           func = function() log("Exiting Debug Menu") os.exit() end },
+}
+
+-- === Menu Loop ===
+while true do
+    print("\n=== Manual Debug Menu ===")
+    for _, a in ipairs(actions) do
+        print("[" .. a.key .. "] " .. a.label)
+    end
+    write("Choose action: ")
+    local input = read()
+    for _, a in ipairs(actions) do
+        if input == a.key then
+            a.func()
+            break
+        end
+    end
+end
