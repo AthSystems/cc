@@ -11,7 +11,7 @@ local nodeMonitor = 24
 
 function logs(message)
     print(message)
-    rednet.send(nodeMonitor, message)
+    rednet.broadcast(message, "skylog")
 end
 
 function send(id, message)
