@@ -30,7 +30,7 @@ while true do
   end
 
   move_plate(l,s)
-  rsp = "Set at " .. tostring(l)
+  rsp = "Block pusher set at " .. tostring(l)
   rednet.send(senderID, rsp)
   print(rsp)
 
