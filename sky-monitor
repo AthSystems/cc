@@ -3,6 +3,12 @@ local modem = peripheral.find("modem") or error("No modem found")
 local monitor = peripheral.find("monitor") or error("No monitor found")
 rednet.open(peripheral.getName(modem))
 
+-- === Configuration ===
+local master_id = 1
+local stop_button_label = "[ STOP ]"
+local stop_button_color = colors.red
+local button_sent_color = colors.green
+
 -- === Display Settings ===
 monitor.setTextScale(0.5)
 monitor.setBackgroundColor(colors.black)
@@ -13,30 +19,40 @@ local lines = {}
 
 -- === Utilities ===
 local function drawLines()
+    monitor.setBackgroundColor(colors.black)
     monitor.clear()
-    for i, entry in ipairs(lines) do
-        local y = i
-        monitor.setCursorPos(1, y)
 
-        -- Set date color (green)
+    -- Draw logs
+    local logHeight = height - 1
+    for i, entry in ipairs(lines) do
+        if i > logHeight then break end
+        monitor.setCursorPos(1, i)
+
+        -- Time in green
         monitor.setTextColor(colors.lime)
         monitor.write(entry.time .. " | ")
 
-        -- Set node/source color (orange)
+        -- Source in orange
         monitor.setTextColor(colors.orange)
         monitor.write(entry.source)
 
-        -- Set message color (white)
+        -- Message in white
         monitor.setTextColor(colors.white)
         monitor.write(" → " .. entry.message)
     end
+
+    -- Draw STOP button
+    monitor.setCursorPos(math.floor((width - #stop_button_label) / 2), height)
+    monitor.setBackgroundColor(stop_button_color)
+    monitor.setTextColor(colors.white)
+    monitor.write(stop_button_label)
 end
 
 local function addLine(source, message)
     local time = os.date("%H:%M:%S")
     table.insert(lines, { time = time, source = source, message = message })
 
-    if #lines > height then
+    if #lines > (height - 1) then
         table.remove(lines, 1)
     end
 
@@ -52,20 +68,46 @@ local function formatFromTable(tbl)
     return source, msg
 end
 
--- === Main Loop ===
-print("Monitor listener running (protocol: sky-logs)...")
+-- === Monitor Touch Handler ===
+local function listenTouch()
+    while true do
+        local event, side, x, y = os.pullEvent("monitor_touch")
 
-while true do
-    local _, msg, protocol = rednet.receive("sky-logs")
+        if y == height then
+            -- Button touched: send stop signal
+            rednet.send(master_id, "stop", "sky-control")
 
-    if type(msg) == "string" then
-        addLine("unknown", msg)
+            -- Confirm feedback
+            table.insert(lines, { time = os.date("%H:%M:%S"), source = "monitor", message = "STOP sent to master" })
+            monitor.setBackgroundColor(button_sent_color)
+            drawLines()
+            sleep(1)
 
-    elseif type(msg) == "table" then
-        local src, body = formatFromTable(msg)
-        addLine(src, body)
-
-    else
-        addLine("system", "Invalid message type")
+            -- Reset button color
+            monitor.setBackgroundColor(colors.black)
+            drawLines()
+        end
     end
 end
+
+-- === Main Log Receiver ===
+local function listenLogs()
+    print("🖥️ Monitor listener running (protocol: sky-logs)...")
+    while true do
+        local _, msg, protocol = rednet.receive("sky-logs")
+
+        if type(msg) == "string" then
+            addLine("unknown", msg)
+
+        elseif type(msg) == "table" then
+            local src, body = formatFromTable(msg)
+            addLine(src, body)
+
+        else
+            addLine("system", "⚠️ Invalid message type")
+        end
+    end
+end
+
+-- === Launch ===
+parallel.waitForAll(listenLogs, listenTouch)
