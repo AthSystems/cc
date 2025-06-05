@@ -1,52 +1,71 @@
--- Node - Deployer
-local gearshift_side = "back"
-local gearshift = peripheral.wrap(gearshift_side)
-
-local modem = peripheral.find("modem") or error("No modem found", 0)
+-- === Setup ===
+local modem = peripheral.find("modem") or error("No modem found")
 rednet.open(peripheral.getName(modem))
 
-local name = "deployNode"
+-- === Metadata ===
+local gearshift_side = "back"
+local gearshift = peripheral.wrap(gearshift_side) or error("No gearshift on " .. gearshift_side)
 
+local name = "deploy_node"
 local max_speed = 2
 local direction_mod = -1
 local speed = max_speed * direction_mod
 
-function prompt(msg)
+-- === Protocols ===
+local ptc_control = "sky-control"
+local ptc_reply   = "sky-reply"
+local ptc_logs    = "sky-logs"
+local ptc_status  = "sky-status"
+
+-- === Utilities ===
+local function prompt(msg)
     print("[" .. os.date("%H:%M:%S") .. "] " .. msg)
 end
 
-prompt("Node " .. name .. " ready")
+local function log(message)
+    prompt(message)
+    rednet.broadcast("Deployer: " .. message, ptc_logs)
+end
 
-function move(length, d)
-    gearshift.move(length, d*speed)
-    prompt("Moving of ".. length .. " | direction : " .. tostring(d))
+log(name .. " ready")
+
+-- === Motion Logic ===
+local function move(length, direction)
+    local real_speed = direction * speed
+    gearshift.move(length, real_speed)
+    prompt("Moving " .. length .. " | direction: " .. tostring(direction))
+
     while gearshift.isRunning() do
         sleep(0.1)
     end
 end
 
-function deploy()
-    move(10,1)
-    move(1,-1)
-    move(1,1)
-    move(1,-1)
-    move(1,1)
-    move(1,-1)
-    move(1,1)
-    move(10,-1)
+local function deploy()
+    move(10,  1)
+    move(1,  -1)
+    move(1,   1)
+    move(1,  -1)
+    move(1,   1)
+    move(1,  -1)
+    move(1,   1)
+    move(10, -1)
 end
 
+-- === Main Loop ===
 while true do
-    local senderID, msg = rednet.receive()
-    
-    if msg == "deploy" then
-        print("[" .. os.date("%H:%M:%S") .. "] " .. msg)
-        deploy()
-        rednet.send(senderID, "Deploy done. [RD]")
-        prompt("Deploy done. [RD]")
+    local senderID, msg, protocol = rednet.receive()
 
-    elseif msg == "ping" then
-        prompt("ping received. Sending pong")
-        rednet.send(senderID, "pong")
-   end
+    -- Ping handling
+    if protocol == ptc_status and msg == "ping" then
+        prompt("Ping received from " .. senderID)
+        rednet.send(senderID, "pong", ptc_reply)
+        log("pong")
+
+    -- Deployment control
+    elseif protocol == ptc_control and msg == "deploy" then
+        log("Deploy command received")
+        deploy()
+        rednet.send(senderID, "Deploy done. [RD]", ptc_reply)
+        log("Deploy done. [RD]")
+    end
 end
