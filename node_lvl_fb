@@ -1,0 +1,39 @@
+-- Node Feedback Template
+local modem = peripheral.find("modem") or error("No modem found", 0)
+rednet.open(peripheral.getName(modem))
+
+
+
+-- To Modify
+local node_level = 0
+local node_side = 0
+local node_name = "LV"..tostring(node_level)
+
+local fb_cmd = "LVL " .. tostring(node_level)
+local fb_side = 0
+
+if node_side == 0 then
+  fb_side = "right"
+else
+  fb_side = "left"
+
+
+local feedback_sent = false
+local last_redstone_state = false
+
+print("Node ".. node_name .. " : ready.")
+
+
+while true do
+  local state = redstone.getInput(fb_side)
+  if(state ~= last_redstone_state) then
+    last_redstone_state = state
+    if last_redstone_state then
+      rednet.send(1, "[ " .. node_name .. "] : " .. fb_cmd)
+      feedback_sent = true
+    else
+      feeback_sent = false
+    end
+  end
+  sleep(0.5)
+end
