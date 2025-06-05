@@ -1,3 +1,43 @@
 -- Node Block Pusher
 local modem = peripheral.find("modem") or error("No modem found", 0)
 rednet.open(peripheral.getName(modem))
+
+local nodeID = os.getComputerID()
+local rs_5m_up = "left"
+local rs_1m_up = "bottom"
+local rs_15_down = "right"
+local name = "pusherNode"
+
+print("Node " .. name .. " ready")
+
+function move_plate(lvl)
+  if lvl == 5 then
+    redstone.setOutput("right", false)
+    redstone.setOutput("bottom", false)
+    redstone.setOutput("left", true)
+  elseif lvl = 1 then
+    redstone.setOutput("left", false)
+    redstone.setOutput("right", false)
+    redstone.setOutput("bottom", true)
+  else 
+    redstone.setOutput("left", false)
+    redstone.setOutput("bottom", false)
+    redstone.setOutput("right", true)
+  end
+end
+
+
+while true do
+    local senderID, msg = rednet.receive()
+
+    if msg == "5m" then
+      move_plate(5)
+      rednet.send(senderID, name .. ": Moving 5m upward.")
+    elseif msg == "1m" then
+      move_plate(1)
+      rednet.send(senderID, name .. ": Moving 1m upward.")
+    else
+      move_plate(0)
+      rednet.send(senderID, name .. ": Moving back to ground.")
+    end
+end
