@@ -35,8 +35,8 @@ local kw_deploy_fb  = "RD"
 -- === Communication Functions ===
 
 function logs(message)
-    print(msg)
-    rednet.sent(nodeMonitor, message)
+    print(message)
+    rednet.send(nodeMonitor, message)
 end
 
 function send(id, message)
