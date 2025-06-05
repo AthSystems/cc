@@ -7,7 +7,6 @@ local nodeDrills = "drillsNode"
 function send(id, message)
     print("→ Sending to " .. id .. ": " .. message)
     rednet.send(id, message)
-    end
 end
 
 
