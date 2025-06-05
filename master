@@ -150,7 +150,7 @@ function farm_cycle()
 
     -- === Drill + Push Loop ===
     while pusher_lvl < 15 do 
-        move_block_pusher_timed(1, 1)
+        move_block_pusher(1)
         toggle_drills()
         sleep(0.5)
     end
