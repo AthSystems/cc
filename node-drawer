@@ -13,6 +13,11 @@ local monitor_id = 100
 local node_name = "drawerNode"
 local slot_check = 1
 
+
+function prompt(msg)
+    print("[" .. os.date("%H:%M:%S") .. "] " .. msg)
+end
+
 function getItemName()
   return drawer.getItemDetail(1)["displayName"]
 end
@@ -35,17 +40,36 @@ function getDrawerData()
   return {getItemName(), getPercentFill(), getCount(), getItemLimit()}
 end
 
-print("Node ".. node_name .. " : ready.")
+prompt("Node ".. node_name .. " : ready.")
 
-while true do 
-  if getPercentFill() >= threshold then
-    rednet.send(master_id, {"stop", getPercentFill()})
-  else 
-    rednet.send(master_id, {"continue", getPercentFill()})
+
+function main_loop()
+  while true do 
+    if getPercentFill() >= threshold then
+      rednet.send(master_id, {"stop", getPercentFill()})
+    else 
+      rednet.send(master_id, {"continue", getPercentFill()})
+    end
+  
+    rednet.send(monitor_id, getDrawerData())
+    prompt(table.unpack(getDrawerData()))
+    sleep(1)
+  
   end
-
-  rednet.send(monitor_id, getDrawerData())
-  print(table.unpack(getDrawerData()))
-  sleep(1)
-
 end
+
+function listening()
+  while true do
+    local senderID, msg = rednet.receive()
+    if msg == "ping" then
+        prompt("ping received. Sending pong")
+        rednet.send(senderID, "pong")
+    end
+  end
+end
+
+
+parallel.waitForAll(listening, main_loop)
+
+
+
