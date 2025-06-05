@@ -53,7 +53,7 @@ local function formatFromTable(tbl)
 end
 
 -- === Main Loop ===
-print("🖥️ Monitor listener running (protocol: sky-logs)...")
+print("Monitor listener running (protocol: sky-logs)...")
 
 while true do
     local _, msg, protocol = rednet.receive("sky-logs")
@@ -66,6 +66,6 @@ while true do
         addLine(src, body)
 
     else
-        addLine("system", "⚠️ Invalid message type")
+        addLine("system", "Invalid message type")
     end
 end
