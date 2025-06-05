@@ -53,6 +53,7 @@ end
 
 
 function move_block_pusher(lvl)
+    print("Pusher level from: " .. pusher_lvl)
     if lvl == 1 then
         if pusher_lvl >= 5 and pusher_lvl <= 15 then
             send(nodePusher, kw_pusher_1m)
@@ -74,6 +75,7 @@ function move_block_pusher(lvl)
             pusher_lvl = 0
         end
     end
+    print("Pusher level to: " .. pusher_lvl)
 end
         
 
