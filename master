@@ -2,7 +2,11 @@ local modem = peripheral.find("modem") or error("No modem", 0)
 rednet.open(peripheral.getName(modem))
 
 local nodeDrills = 0
-
+local drill_state = false
+local kw_drills_frontward = "frontward"
+local kw_drills_fb_frontward = "DFF"
+local kw_drills_backward = "backward"
+local kw_drills_fb_backward = "DFB"
 
 function send(id, message)
     print("→ Sending to " .. id .. ": " .. message)
@@ -23,10 +27,16 @@ function stop()
     print("Stopping farm")
 end
 
+fun toggleDrills()
+    if drill_state then
+        send(nodeDrills, kw_drills_backward)
+        waitForReplay(kw_drills_fb_backward)
+    else 
+        send(nodeDrills, kw_drills_frontward)
+        waitForReply(kw_drills_fb_frontward)
+end
 
-send(nodeDrills,"backward")
-waitForReply("DFB")
-send(nodeDrills,"frontward")
-waitForReply("DFF")
-send(nodeDrills,"backward")
-waitForReply("DFB")
+for i=1,10 do
+    toggleDrills()
+    sleep(3)
+end
