@@ -21,7 +21,7 @@ while true do
   if(state ~= last_redstone_state) then
     last_redstone_state = state
     if last_redstone_state then
-      rednet.send(1, feedback_command)
+      rednet.send(1, "[ " .. node_name .. "] : " .. feedback_command)
       feedback_sent = true
     else
       feeback_sent = false
