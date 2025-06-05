@@ -104,9 +104,12 @@ local function move_block_pusher(target_lvl)
     end
 end
 
-local function reset()
+function reset()
     move_block_pusher(0)
-    move_drills(true)
+    if not drill_state then
+        move_drills(true) -- only send back if forward
+        drill_state = true
+    end
 end
 
 -- === Farm Loop ===
