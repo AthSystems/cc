@@ -1,32 +1,40 @@
-local modem = peripheral.find("modem") or error("No modem", 0)
+-- === Setup ===
+local modem = peripheral.find("modem") or error("No modem found")
 rednet.open(peripheral.getName(modem))
 
+-- === Global State ===
 local farm_running = false
-
-
-local nodeDrills = 0
 local drill_state = false
-local kw_drills_frontward = "frontward"
-local kw_drills_fb_frontward = "DFF"
-local kw_drills_backward = "backward"
+local pusher_lvl = 0
+
+-- === Node IDs ===
+local nodeDrills = 0
+local nodePusher = 5
+local nodeDeploy = 18
+
+-- === Drill Keywords ===
+local kw_drills_forward     = "frontward"
+local kw_drills_fb_forward  = "DFF"
+local kw_drills_backward    = "backward"
 local kw_drills_fb_backward = "DFB"
 
-local nodePusher = 5
-local pusher_lvl = 0
-local kw_pusher_5m = "5m"
-local kw_pusher_fb_5m = "LVL5"
-local kw_pusher_1m = "1m"
-local kw_pusher_fb_1m = "LVL"
-local kw_pusher_ground = "0m"
-local kw_pusher_fb_ground = "LVL0"
-local kw_pusher_fb_top = "LVL15"
+-- === Pusher Keywords ===
+local kw_pusher_5m      = 5
+local kw_pusher_fb_5m   = "LVL 5"
+local kw_pusher_1m      = 1
+local kw_pusher_fb_1m   = "LVL"
+local kw_pusher_ground  = -15
+local kw_pusher_fb_ground = "LVL 0"
+local kw_pusher_fb_top  = "LVL 15"
 
-local nodeDeploy = 18
-local kw_deploy = "deploy"
-local kw_deploy_fb ="deployed"
+-- === Deploy Keywords ===
+local kw_deploy     = "deploy"
+local kw_deploy_fb  = "deployed"
+
+-- === Communication Functions ===
 
 function send(id, message)
-    print("Sending to " .. id .. ": " .. message)
+    print("→ Sending to " .. id .. ": " .. message)
     rednet.send(id, message)
 end
 
@@ -36,18 +44,16 @@ function waitForReply(keyword, timeout)
     while true do
         local timeLeft = timeout and math.max(0.1, timeout - (os.clock() - start)) or nil
         if timeLeft and timeLeft <= 0 then
-            print("Timeout waiting for: " .. keyword)
+            print("⚠️ Timeout waiting for: " .. keyword)
             return nil, nil
         end
 
         local _, msg = rednet.receive(timeLeft)
         if msg and msg:find(keyword) then
             print("✔ " .. msg)
-
-            -- Only extract the number after "LVL"
+            -- Extract number following 'LVL'
             local lvlStr = string.match(msg, "LVL ?(%d+)")
             local level = tonumber(lvlStr)
-
             return msg, level
         end
     end
@@ -55,92 +61,86 @@ end
 
 function sendAndWait(id, message, waitFor, timeout)
     send(id, message)
-    reply, level = waitForReply(waitFor, timeout)
+    local reply, level = waitForReply(waitFor, timeout)
     return reply, level
 end
 
-function stop()
-    print("Stopping farm")
-end
+-- === Drill Control ===
 
 function toggleDrills()
     if drill_state then
-        sendAndWait(nodeDrills, kw_drills_backward,kw_drills_fb_backward)
-    else 
-        sendAndWait(nodeDrills, kw_drills_frontward,kw_drills_fb_frontward)
+        sendAndWait(nodeDrills, kw_drills_backward, kw_drills_fb_backward)
+    else
+        sendAndWait(nodeDrills, kw_drills_forward, kw_drills_fb_forward)
     end
     drill_state = not drill_state
 end
 
+-- === Pusher Control ===
 
-function move_block_pusher(lvl, timeout)
-
-    if lvl == 1 then
+function move_block_pusher(target_lvl, timeout)
+    if target_lvl == 1 then
         if pusher_lvl >= 5 and pusher_lvl <= 15 then
             send(nodePusher, kw_pusher_1m)
+
             if pusher_lvl == 14 then
-                msg, lvl = waitForReply(kw_pusher_fb_top)
-                print("Level Debug : " .. tostring(lvl))
-                pusher_lvl = lvl
+                _, new_lvl = waitForReply(kw_pusher_fb_top)
             else
-                pusher_lvl = waitForReply(kw_pusher_fb_1m)
-                print("Level Debug : " .. tostring(lvl))
-                pusher_lvl = lvl
+                _, new_lvl = waitForReply(kw_pusher_fb_1m)
+            end
+
+            if new_lvl then
+                pusher_lvl = new_lvl
+                print("Pusher Level: " .. pusher_lvl)
             end
         end
 
-    elseif lvl == 5 then
+    elseif target_lvl == 5 then
         if pusher_lvl == 0 then
-            msg, lvl  = sendAndWait(nodePusher, kw_pusher_5m, kw_pusher_fb_5m)
-            print("Level Debug : " .. tostring(lvl))
-            pusher_lvl = lvl
+            _, new_lvl = sendAndWait(nodePusher, kw_pusher_5m, kw_pusher_fb_5m)
+            if new_lvl then
+                pusher_lvl = new_lvl
+                print("Pusher Level: " .. pusher_lvl)
+            end
         end
 
-    elseif lvl == 0 then
+    elseif target_lvl == 0 then
         if pusher_lvl == 15 then
-            msg, lvl  = sendAndWait(nodePusher, kw_pusher_ground, kw_pusher_fb_ground)
-            print("Level Debug : " .. tostring(lvl))
-            pusher_lvl = lvl
+            _, new_lvl = sendAndWait(nodePusher, kw_pusher_ground, kw_pusher_fb_ground)
+            if new_lvl then
+                pusher_lvl = new_lvl
+                print("Pusher Level: " .. pusher_lvl)
+            end
         end
     end
-
-    print("Pusher level to: " .. pusher_lvl)
 end
+
+-- === Deploy Control ===
 
 function deploy()
     sendAndWait(nodeDeploy, kw_deploy, kw_deploy_fb)
 end
 
+-- === Farm Sequence ===
 
 function farm_cycle()
+    if farm_running then return end
 
-    if not farm_running then 
+    deploy()
+    sleep(6)
 
-        deploy()
-        sleep(6)
+    move_block_pusher(5)  -- Move from 0m to 5m
 
-        -- Start moving up
-        move_block_pusher(5)
-
-        --while pusher_lvl < 7 do
-        --  move_block_pusher(1)
-        --    toggleDrills()
-        --end
-
-        -- Start drilling
+    toggleDrills()
+    while pusher_lvl < 15 do 
+        move_block_pusher(1)
         toggleDrills()
-        while pusher_lvl < 15 do 
-            move_block_pusher(1)
-            toggleDrills()
-        end
-
-        -- Reset
-        move_block_pusher(0)
-        toggleDrills()
-
     end
+
+    move_block_pusher(0)  -- Reset to ground
+    toggleDrills()
 end
 
+-- === Start ===
 sleep(5)
 farm_cycle()
-
