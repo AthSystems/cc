@@ -1,0 +1,51 @@
+
+local drawer_side = "back"
+local threshold = 90
+
+
+local drawer = peripheral.wrap(drawer_side) or error ("No drawer found at " .. drawer_side, 0)
+
+local modem = peripheral.find("modem") or error("No modem", 0)
+rednet.open(peripheral.getName(modem))
+
+local master_id = 1
+local monitor_id = 100
+local node_name = "drawerNode"
+local slot_check = 1
+
+function getItemName()
+  return drawer.getItemDetail(1)["displayName"]
+end
+
+function getCount()
+  return drawer.getItemDetail(1)["count"]
+end
+
+function getItemLimit()
+  return drawer.getItemLimit(1)
+end
+
+function getPercentFill()
+  local limit = drawer.getItemLimit(1)
+  local count = drawer.getItemDetail(1)["count"]
+  return (count/limit) * 100
+end
+
+function getDrawerData()
+  return {getItemName(), getPercentFill(), getCount(), getItemLimit()}
+end
+
+print("Node ".. node_name .. " : ready)
+
+while true do 
+  if getPercentFill() >= treshold then
+    rednet.send(master_id, {"stop", getPercentFill()}
+  else 
+    rednet.send(master_id, {"continue", getPercentFill()}
+  end
+
+  rednet.send(monitor_id, getDrawerData())
+
+  sleep(1)
+
+end
