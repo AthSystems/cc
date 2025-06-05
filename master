@@ -130,7 +130,7 @@ function farm_cycle()
         local timeout = 7
 
         while os.clock() - start < timeout do
-            move_block_pusher_timed(1, 1)
+            move_block_pusher_timed(1)
             sleep(0.5)
 
             if pusher_lvl >= 6 then
