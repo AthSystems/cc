@@ -3,33 +3,69 @@ local modem = peripheral.find("modem") or error("No modem found")
 local monitor = peripheral.find("monitor") or error("No monitor found")
 rednet.open(peripheral.getName(modem))
 
+-- === Display Settings ===
 monitor.setTextScale(0.5)
 monitor.setBackgroundColor(colors.black)
-monitor.setTextColor(colors.white)
 monitor.clear()
 
 local width, height = monitor.getSize()
 local lines = {}
 
--- Adds a line and scrolls if needed
-local function addLine(text)
-    table.insert(lines, text)
+-- === Utilities ===
+local function drawLines()
+    monitor.clear()
+    for i, entry in ipairs(lines) do
+        local y = i
+        monitor.setCursorPos(1, y)
+
+        -- Set date color (green)
+        monitor.setTextColor(colors.lime)
+        monitor.write(entry.time .. " | ")
+
+        -- Set node/source color (orange)
+        monitor.setTextColor(colors.orange)
+        monitor.write(entry.source)
+
+        -- Set message color (white)
+        monitor.setTextColor(colors.white)
+        monitor.write(" → " .. entry.message)
+    end
+end
+
+local function addLine(source, message)
+    local time = os.date("%H:%M:%S")
+    table.insert(lines, { time = time, source = source, message = message })
+
     if #lines > height then
         table.remove(lines, 1)
     end
 
-    monitor.clear()
-    for i, line in ipairs(lines) do
-        monitor.setCursorPos(1, i)
-        monitor.write(line)
+    drawLines()
+end
+
+local function formatFromTable(tbl)
+    local source = tbl.source or "unknown"
+    local msg = tbl.status or tbl.message or tbl.msg or "unknown"
+    if tbl.level then
+        source = source .. " @ LVL " .. tostring(tbl.level)
     end
+    return source, msg
 end
 
 -- === Main Loop ===
-print("Monitor listener running...")
+print("🖥️ Monitor listener running (protocol: sky-logs)...")
+
 while true do
-    local senderId, message = rednet.receive()
-    if type(message) == "string" then
-        addLine(os.date("%H:%M:%S") .. " | " .. message)
+    local _, msg, protocol = rednet.receive("sky-logs")
+
+    if type(msg) == "string" then
+        addLine("unknown", msg)
+
+    elseif type(msg) == "table" then
+        local src, body = formatFromTable(msg)
+        addLine(src, body)
+
+    else
+        addLine("system", "⚠️ Invalid message type")
     end
 end
