@@ -184,11 +184,21 @@ end
 log("Master initializing.")
 pingAllNodes()
 reset_all()
-log("System initialized. Ready.")
+log("System initialized. Waiting for manual start...")
 
+-- === Main Loop ===
 parallel.waitForAny(stop_listener, function()
+    -- Wait for manual start first
+    while manual_stopped do
+        sleep(0.5)
+    end
+
+    log("Manual start received. Beginning cycles.")
+
     while true do
-        farm_cycle()
+        if not manual_stopped and not drawer_stopped then
+            farm_cycle()
+        end
         sleep(1)
     end
 end)
