@@ -9,8 +9,11 @@ local modem = peripheral.find("modem") or error("No modem found", 0)
 local gearshift = peripheral.wrap("bottom")
 rednet.open(peripheral.getName(modem))
 
+function prompt(msg)
+    print("[" .. os.date("%H:%M:%S") .. "] " .. msg)
+end
 
-print("Node " .. name .. " ready")
+prompt("Node " .. name .. " ready")
 
 
 function move_plate(length, speed)
@@ -21,18 +24,31 @@ move_plate(15,-2)
 
 while true do
   local senderID, msg = rednet.receive()
-  print("Message received : " .. msg)
-  local l = tonumber(msg)
-  local s = 2
 
-  if l < 0 then
-    s = -2
+  if msg == "ping" then
+
+    prompt("ping received. Sending pong")
+    rednet.send(senderID, "pong")
+
+  else
+
+    prompt("Command received : " .. msg)
+    local l = tonumber(msg)
+    local s = 2
+  
+    if l < 0 then
+      s = -2
+    end
+  
+    move_plate(l,s)
+    rsp = "Block pusher set at " .. tostring(l)
+    rednet.send(senderID, rsp)
+    prompt(rsp)
+
   end
 
-  move_plate(l,s)
-  rsp = "Block pusher set at " .. tostring(l)
-  rednet.send(senderID, rsp)
-  print(rsp)
+
+  
 
 end
  
