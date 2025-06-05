@@ -35,17 +35,17 @@ function getDrawerData()
   return {getItemName(), getPercentFill(), getCount(), getItemLimit()}
 end
 
-print("Node ".. node_name .. " : ready)
+print("Node ".. node_name .. " : ready.")
 
 while true do 
-  if getPercentFill() >= treshold then
-    rednet.send(master_id, {"stop", getPercentFill()}
+  if getPercentFill() >= threshold then
+    rednet.send(master_id, {"stop", getPercentFill()})
   else 
-    rednet.send(master_id, {"continue", getPercentFill()}
+    rednet.send(master_id, {"continue", getPercentFill()})
   end
 
   rednet.send(monitor_id, getDrawerData())
-
+  print(table.unpack(getDrawerData()))
   sleep(1)
 
 end
