@@ -16,7 +16,7 @@ if node_side == 0 then
   fb_side = "right"
 else
   fb_side = "left"
-end
+end   
 
 
 local feedback_sent = false
