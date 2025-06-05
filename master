@@ -65,6 +65,8 @@ function move_block_pusher(lvl)
         if pusher_lvl == 15 then
             sendAndWait(nodePusher, kw_pusher_ground, kw_pusher_fb_ground)
         end
+    end
+end
         
 
 sleep(10)
