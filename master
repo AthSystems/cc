@@ -87,10 +87,7 @@ local function deploy()
 end
 
 local function move_block_pusher(target_lvl)
-    if target_lvl == 5 and pusher_lvl == 0 then
-        _, new = sendAndWait(nodePusher, 5, "LVL 5")
-        pusher_lvl = new or pusher_lvl
-    elseif target_lvl == 1 and pusher_lvl <= 14 then
+    if target_lvl == 1 then
         send(nodePusher, 1)
         if pusher_lvl == 14 then
             _, new = waitForReply("LVL 15")
@@ -98,11 +95,13 @@ local function move_block_pusher(target_lvl)
             _, new = waitForReply("LVL")
         end
         pusher_lvl = new or pusher_lvl
-    elseif target_lvl == 0 and pusher_lvl == 15 then
+
+    elseif target_lvl == 0 then
         _, new = sendAndWait(nodePusher, -15, "LVL 0")
         pusher_lvl = new or pusher_lvl
     end
 end
+
 
 function reset()
     move_block_pusher(0)
