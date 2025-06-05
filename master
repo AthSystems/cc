@@ -30,7 +30,7 @@ end
 function toggleDrills()
     if drill_state then
         send(nodeDrills, kw_drills_backward)
-        waitForReplay(kw_drills_fb_backward)
+        waitForReply(kw_drills_fb_backward)
     else 
         send(nodeDrills, kw_drills_frontward)
         waitForReply(kw_drills_fb_frontward)
