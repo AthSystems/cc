@@ -9,13 +9,24 @@ function send(id, message)
     rednet.send(id, message)
 end
 
+function waitForReply(waitFor)
+    while true do
+        local _, reply = rednet.receive(5)
+        if reply and string.find(reply, waitFor) then
+            print("✔ " .. reply)
+            break
+        end
+    end
+end
+
 function stop()
     print("Stopping farm")
 end
 
 
 send(nodeDrills,"backward")
-sleep(5)
+waitForReply("drills_full_backward")
 send(nodeDrills,"frontward")
-sleep(5)
+waitForReply("drills_full_frontward")
 send(nodeDrills,"backward")
+waitForReply("drills_full_backward")
