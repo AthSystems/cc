@@ -52,7 +52,7 @@ end
 
 
 function ping(nodeId)
-  send(nodeId, "ping", "pong", 5)
+  sendAndWaitWithTimeout(nodeId, "ping", "pong", 5)
 end
 
 ping(nodeDrills)
