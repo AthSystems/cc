@@ -7,17 +7,26 @@ local name = "drillsNode"
 local kw_forward = "forward"
 local kw_backward = "backward"
 
-print("Node " .. name .. " ready")
+function prompt(msg)
+    print("[" .. os.date("%H:%M:%S") .. "] " .. msg)
+end
+
+prompt("Node " .. name .. " ready")
 
 while true do
     local senderID, msg = rednet.receive()
-    print("Message received : ".. msg)
     if msg == kw_forward then
+        prompt("Command received : ".. msg)
         redstone.setOutput(controlledSide, false)
         rednet.send(senderID, name .. ": Moving frontward.")
     
     elseif msg == kw_backward then
+        prompt("Command received : ".. msg)
         redstone.setOutput(controlledSide, true)
         rednet.send(senderID, name .. ": Moving backward.")
+
+    elseif msg == "ping" then
+        prompt("ping received. Sending pong")
+        rednet.send(senderID, "pong")
     end
 end
