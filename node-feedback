@@ -3,5 +3,19 @@ local modem = peripheral.find("modem") or error("No modem found", 0)
 rednet.open(peripheral.getName(modem))
 
 local feedback_command = "undefined"
+local redstone_side = "undefined"
+local feedback_sent = false
+local last_redstone_state = false
 
-rednet.send(1, feedback_command)
+while true do
+  local state = redstone.getInput(redstone_side)
+  if(state ~= last_redstone_state) then
+    last_redstone_state = state
+    if last_redstone_state then
+      rednet.send(1, feedback_command)
+      feedback_sent = true
+    else
+      feeback_sent = false
+    end
+  end
+end
