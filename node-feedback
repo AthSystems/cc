@@ -1,0 +1,7 @@
+-- Node Feedback Template
+local modem = peripheral.find("modem") or error("No modem found", 0)
+rednet.open(peripheral.getName(modem))
+
+local feedback_command = "undefined"
+
+rednet.send(1, feedback_command)
