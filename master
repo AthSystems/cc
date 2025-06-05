@@ -220,7 +220,7 @@ function farm_cycle()
         toggle_drills()
     end
 
-    reset
+    reset()
 end
 
 -- === Start ===
