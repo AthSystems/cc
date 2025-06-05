@@ -1,0 +1,14 @@
+local modem = peripheral.find("modem") or error("No modem", 0)
+rednet.open(peripheral.getName(modem))
+
+local nodeDrills = "drillsNode"
+
+
+function send(id, message)
+    print("→ Sending to " .. id .. ": " .. message)
+    rednet.send(id, message)
+    end
+end
+
+
+send(nodeDrills,"backward")
