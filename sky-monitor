@@ -7,22 +7,14 @@ rednet.open(peripheral.getName(modem))
 local master_id = 1
 local ptc_logs = "sky-logs"
 local ptc_control = "sky-control"
-local stop_button_label = "[   STOP   ]"
-local clear_button_label = "[ CLEAR ]"
 
 -- === ID to Name Map ===
 local idMap = {
-    [0] = "Drills",
-    [1] = "Master",
-    [2] = "DFF",
-    [3] = "DFB",
-    [5] = "Pusher",
+    [0] = "Drills", [1] = "Master", [2] = "DFF", [3] = "DFB", [5] = "Pusher",
     [6] = "LV 0", [7] = "LV 6", [8] = "LV 8", [9] = "LV 10",
     [10] = "LV 12", [11] = "LV 14", [12] = "LV 5", [13] = "LV 7",
     [14] = "LV 9", [15] = "LV 11", [16] = "LV 13", [17] = "LV 15",
-    [20] = "Deployer",
-    [23] = "Drawer",
-    [24] = "Monitor"
+    [20] = "Deployer", [23] = "Drawer", [24] = "Monitor"
 }
 
 -- === Monitor Setup ===
@@ -31,6 +23,21 @@ monitor.setBackgroundColor(colors.black)
 monitor.clear()
 local width, height = monitor.getSize()
 local lines = {}
+local isRunning = false
+
+-- === Button Config ===
+local toggle_button = {
+    label = "[  START  ]",
+    x = math.floor((width - 11) / 2), -- 11 chars wide
+    y = height,
+    w = 11
+}
+local clear_button = {
+    label = "[ CLEAR ]",
+    x = width - 8,
+    y = height,
+    w = 8
+}
 
 -- === Utilities ===
 local function drawUI()
@@ -52,17 +59,17 @@ local function drawUI()
         monitor.write(" -> " .. entry.message)
     end
 
-    -- STOP button (centered)
-    monitor.setCursorPos(math.floor((width - #stop_button_label) / 2), height)
-    monitor.setBackgroundColor(colors.red)
+    -- Toggle Button
+    monitor.setCursorPos(toggle_button.x, toggle_button.y)
+    monitor.setBackgroundColor(isRunning and colors.red or colors.green)
     monitor.setTextColor(colors.white)
-    monitor.write(stop_button_label)
+    monitor.write(toggle_button.label)
 
-    -- CLEAR button (bottom-right)
-    monitor.setCursorPos(width - #clear_button_label + 1, height)
+    -- Clear Button
+    monitor.setCursorPos(clear_button.x, clear_button.y)
     monitor.setBackgroundColor(colors.gray)
     monitor.setTextColor(colors.white)
-    monitor.write(clear_button_label)
+    monitor.write(clear_button.label)
 end
 
 local function addLine(senderID, message)
@@ -106,12 +113,18 @@ local function listenTouch()
     while true do
         local _, _, x, y = os.pullEvent("monitor_touch")
 
-        if y == height then
-            if x >= math.floor((width - #stop_button_label) / 2) and x <= math.floor((width + #stop_button_label) / 2) then
-                rednet.send(master_id, "stop", ptc_control)
-                table.insert(lines, { time = os.date("%H:%M:%S"), source = "Monitor", message = "STOP sent to master" })
+        if y == toggle_button.y then
+            if x >= toggle_button.x and x <= toggle_button.x + toggle_button.w - 1 then
+                isRunning = not isRunning
+                toggle_button.label = isRunning and "[  STOP   ]" or "[  START  ]"
+                rednet.send(master_id, isRunning and "start" or "stop", ptc_control)
+                table.insert(lines, {
+                    time = os.date("%H:%M:%S"),
+                    source = "Monitor",
+                    message = (isRunning and "START" or "STOP") .. " sent to master"
+                })
                 drawUI()
-            elseif x >= width - #clear_button_label + 1 and x <= width then
+            elseif x >= clear_button.x and x <= clear_button.x + clear_button.w - 1 then
                 lines = {}
                 drawUI()
             end
