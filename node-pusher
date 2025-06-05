@@ -1,54 +1,66 @@
--- Node Block Pusher
-
-
-local name = "pusherNode"
-local gear_side = "top"
-
-
+-- === Setup ===
 local modem = peripheral.find("modem") or error("No modem found", 0)
-local gearshift = peripheral.wrap("bottom")
+local gearshift = peripheral.wrap("bottom") or error("No gearshift on bottom")
+
 rednet.open(peripheral.getName(modem))
 
-function prompt(msg)
+-- === Metadata ===
+local name = "pusher_node"
+local default_speed = 2
+
+-- === Protocols ===
+local ptc_control = "sky-control"
+local ptc_reply   = "sky-reply"
+local ptc_logs    = "sky-logs"
+local ptc_status  = "sky-status"
+
+-- === Utilities ===
+local function prompt(msg)
     print("[" .. os.date("%H:%M:%S") .. "] " .. msg)
 end
 
-prompt("Node " .. name .. " ready")
-
-
-function move_plate(length, speed)
-  gearshift.move(length, speed)
+local function log(message)
+    prompt(message)
+    rednet.broadcast("Pusher: " .. message, ptc_logs)
 end
 
-move_plate(15,-2)
+-- === Motion Function ===
+local function move_plate(length, speed)
+    gearshift.move(length, speed)
+end
 
+-- === Optional Startup Reset ===
+move_plate(15, -2)
+
+log(name .. " ready")
+
+-- === Main Loop ===
 while true do
-  local senderID, msg = rednet.receive()
+    local senderID, msg, protocol = rednet.receive()
 
-  if msg == "ping" then
+    -- === Status Ping Handler ===
+    if protocol == ptc_status and msg == "ping" then
+        prompt("Ping received from " .. senderID)
+        rednet.send(senderID, "pong", ptc_reply)
 
-    prompt("ping received. Sending pong")
-    rednet.send(senderID, "pong")
+    -- === Command Handler ===
+    elseif protocol == ptc_control then
+        prompt("Command received: " .. tostring(msg))
+        
+        local length = tonumber(msg)
+        if length then
+            local speed = (length < 0) and -default_speed or default_speed
+            move_plate(length, speed)
 
-  else
-
-    prompt("Command received : " .. msg)
-    local l = tonumber(msg)
-    local s = 2
-  
-    if l < 0 then
-      s = -2
+            local response = "Set plate to " .. tostring(length)
+            rednet.send(senderID, response, ptc_reply)
+            log(response)
+            prompt(response)
+        else
+            local err = "Invalid pusher command: " .. tostring(msg)
+            rednet.send(senderID, err, ptc_reply)
+            log(err)
+            prompt("⚠️ " .. err)
+        end
     end
-  
-    move_plate(l,s)
-    rsp = "Block pusher set at " .. tostring(l)
-    rednet.send(senderID, rsp)
-    prompt(rsp)
-
-  end
-
-
-  
-
 end
- 
