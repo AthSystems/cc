@@ -25,7 +25,7 @@ local function log(msg)
     rednet.broadcast("[" .. node_name .. "] : " .. msg, ptc_logs)
 end
 
-log(node_name .. "ready. Listening on " .. redstone_side .. ".")
+log("Ready. Listening on " .. redstone_side .. ".")
 
 -- === Loop: Watch redstone input ===
 while true do
