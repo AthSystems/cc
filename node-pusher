@@ -42,6 +42,7 @@ while true do
     if protocol == ptc_status and msg == "ping" then
         prompt("Ping received from " .. senderID)
         rednet.send(senderID, "pong", ptc_reply)
+        log("pong")
 
     -- === Command Handler ===
     elseif protocol == ptc_control then
@@ -53,14 +54,11 @@ while true do
             move_plate(length, speed)
 
             local response = "Set plate to " .. tostring(length)
-            rednet.send(senderID, response, ptc_reply)
             log(response)
-            prompt(response)
         else
             local err = "Invalid pusher command: " .. tostring(msg)
             rednet.send(senderID, err, ptc_reply)
             log(err)
-            prompt("⚠️ " .. err)
         end
     end
 end
