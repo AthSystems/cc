@@ -30,19 +30,33 @@ function send(id, message)
     rednet.send(id, message)
 end
 
-function waitForReply(waitFor)
+function waitForReply(keyword, timeout)
+    local start = timeout and os.clock() or nil
+
     while true do
-        local _, reply = rednet.receive(5)
-        if reply and string.find(reply, waitFor) then
-            print(reply)
-            break
+        local timeLeft = timeout and math.max(0.1, timeout - (os.clock() - start)) or nil
+        if timeLeft and timeLeft <= 0 then
+            print("Timeout waiting for: " .. keyword)
+            return nil, nil
+        end
+
+        local _, msg = rednet.receive(timeLeft)
+        if msg and msg:find(keyword) then
+            print("✔ " .. msg)
+
+            -- Only extract the number after "LVL"
+            local lvlStr = string.match(msg, "LVL(%d+)")
+            local level = tonumber(lvlStr)
+
+            return msg, level
         end
     end
 end
 
-function sendAndWait(id, message, waitFor)
+function sendAndWait(id, message, waitFor, timeout)
     send(id, message)
-    waitForReply(waitFor)
+    reply, level = waitForReply(waitFor, timeout)
+    return reply, level
 end
 
 function stop()
@@ -59,29 +73,31 @@ function toggleDrills()
 end
 
 
-function move_block_pusher(lvl)
+function move_block_pusher(lvl, timeout)
     print("Pusher level from: " .. pusher_lvl)
+
     if lvl == 1 then
         if pusher_lvl >= 5 and pusher_lvl <= 15 then
             send(nodePusher, kw_pusher_1m)
             if pusher_lvl == 14 then
-                waitForReply(kw_pusher_fb_top)
+                pusher_lvl = waitForReply(kw_pusher_fb_top)
             else
-                waitForReply(kw_pusher_fb_1m)
+                pusher_lvl = waitForReply(kw_pusher_fb_1m)
             end
             pusher_lvl = pusher_lvl + 1
         end
+
     elseif lvl == 5 then
         if pusher_lvl == 0 then
-            sendAndWait(nodePusher, kw_pusher_5m, kw_pusher_fb_5m)
-            pusher_lvl = 5
+            pusher_lvl = sendAndWait(nodePusher, kw_pusher_5m, kw_pusher_fb_5m, timeout)
         end
+
     elseif lvl == 0 then
         if pusher_lvl == 15 then
-            sendAndWait(nodePusher, kw_pusher_ground, kw_pusher_fb_ground)
-            pusher_lvl = 0
+            pusher_lvl = sendAndWait(nodePusher, kw_pusher_ground, kw_pusher_fb_ground)
         end
     end
+
     print("Pusher level to: " .. pusher_lvl)
 end
 
@@ -91,20 +107,33 @@ end
 
 
 function farm_cycle()
+
     if not farm_running then 
+
         deploy()
-        sleep(6)
-        move_block_pusher(5)
+        sleep(4)
+
+        -- Start moving up
+        move_block_pusher(5,1)
+        while pusher_lvl < 7 do
+            move_block_pusher(1)
+            toggleDrills()
+        end
+
+        -- Start drilling
         toggleDrills()
         while pusher_lvl < 15do 
             move_block_pusher(1)
             toggleDrills()
         end
+
+        -- Reset
         move_block_pusher(0)
         toggleDrills()
+
     end
 end
 
-
+sleep(5)
 farm_cycle()
 
