@@ -4,7 +4,7 @@ rednet.open(peripheral.getName(modem))
 
 -- === Global State ===
 local farm_running = false
-local drill_state = false
+local drill_state = true
 local pusher_lvl = 0
 
 -- === Node IDs ===
@@ -210,8 +210,8 @@ function farm_cycle()
     sleep(6)
 
     while pusher_lvl < 7 do
-        move_block_pusher_timed(1,0.5)
-        sleep(0.5)
+        move_block_pusher_timed(1,1)
+        sleep(1)
     end
 
     toggle_drills()
