@@ -80,11 +80,11 @@ function move_block_pusher(lvl, timeout)
             send(nodePusher, kw_pusher_1m)
             if pusher_lvl == 14 then
                 msg, lvl = waitForReply(kw_pusher_fb_top)
-                print("Level Debug : " .. tostring(lvl)
+                print("Level Debug : " .. tostring(lvl))
                 pusher_lvl = lvl
             else
                 pusher_lvl = waitForReply(kw_pusher_fb_1m)
-                print("Level Debug : " .. tostring(lvl)
+                print("Level Debug : " .. tostring(lvl))
                 pusher_lvl = lvl
             end
         end
@@ -92,14 +92,14 @@ function move_block_pusher(lvl, timeout)
     elseif lvl == 5 then
         if pusher_lvl == 0 then
             msg, lvl  = sendAndWait(nodePusher, kw_pusher_5m, kw_pusher_fb_5m)
-            print("Level Debug : " .. tostring(lvl)
+            print("Level Debug : " .. tostring(lvl))
             pusher_lvl = lvl
         end
 
     elseif lvl == 0 then
         if pusher_lvl == 15 then
             msg, lvl  = sendAndWait(nodePusher, kw_pusher_ground, kw_pusher_fb_ground)
-            print("Level Debug : " .. tostring(lvl)
+            print("Level Debug : " .. tostring(lvl))
             pusher_lvl = lvl
         end
     end
