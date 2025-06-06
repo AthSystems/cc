@@ -32,6 +32,7 @@ local farm_running = false
 local function logs(msg)
     if not debug then
         print("[" .. os.date("%H:%M:%S") .. "] " .. msg)
+    end
     rednet.send(nodeMonitor, msg, ptc_logs)
 end
 
