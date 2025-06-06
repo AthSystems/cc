@@ -54,7 +54,7 @@ local function listen()
     while true do
         local id, msg, protocol = rednet.receive()
         if msg == "ping" then
-            rednet.send(id, "pong", ptc-status)
+            rednet.send(id, "pong", ptc_reply)
         elseif msg == kw_fill then
             local data = getDrawerData()
             if data then
