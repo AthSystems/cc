@@ -179,6 +179,7 @@ end
 -- === Farm Loop ===
 function farm_cycle()
     if farm_running then return end
+    if manual_stop or drawer_stop then return end  -- ✅ extra safety
     farm_running = true
 
     local start_time = os.clock()
@@ -246,9 +247,11 @@ local function listenControl()
                 if sender == nodeMonitor then
                     manual_stop = true
                     logs("Manual stop triggered.")
+                    if farm_running then logs("Stop received during cycle – will stop after completion.") end
                 elseif sender == nodeDrawer then
                     drawer_stop = true
                     logs("Drawer triggered stop.")
+                    if farm_running then logs("Stop received during cycle – will stop after completion.") end
                 end
             elseif msg == "start" then
                 if sender == nodeMonitor then
@@ -286,16 +289,10 @@ parallel.waitForAny(
     function()
         waitManualStart()
         while true do
-            if not manual_stop and not drawer_stop then
+            if not manual_stop and not drawer_stop and not farm_running then
                 farm_cycle()
-
-                -- Add these log checks right after farm_cycle ends
-                if manual_stop then
-                    logs("Manual stop active after cycle. Waiting for resume.")
-                end
-                if drawer_stop then
-                    logs("Drawer stop active after cycle. Waiting for drawer to empty.")
-                end
+                if manual_stop then logs("Manual stop active after cycle.") end
+                if drawer_stop then logs("Drawer stop active after cycle.") end
             end
             sleep(0.5)
         end
