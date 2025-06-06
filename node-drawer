@@ -46,7 +46,7 @@ local function monitorDrawer()
         local data = getDrawerData()
         if data then
             if data.percent >= threshold_stop and not auto_stopped then
-                rednet.send(master_id, "stop", ptc_control)
+                rednet.send(master_id, "stop", ptc_control) 
                 log("Threshold exceeded: sending STOP")
                 auto_stopped = true
             elseif data.percent <= threshold_resume and auto_stopped then
