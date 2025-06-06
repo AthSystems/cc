@@ -13,6 +13,7 @@ local threshold_stop = 90
 local threshold_resume = 10
 local ptc_logs = "sky-logs"
 local ptc_status = "sky-status"
+local ptc_control = "sky-control"
 
 local auto_stopped = false
 
@@ -45,11 +46,11 @@ local function monitorDrawer()
         local data = getDrawerData()
         if data then
             if data.percent >= threshold_stop and not auto_stopped then
-                rednet.send(master_id, "stop", ptc_status)
+                rednet.send(master_id, "stop", ptc_control)
                 log("Threshold exceeded: sending STOP")
                 auto_stopped = true
             elseif data.percent <= threshold_resume and auto_stopped then
-                rednet.send(master_id, "start", ptc_status)
+                rednet.send(master_id, "start", ptc_control)
                 log("Below resume threshold: sending START")
                 auto_stopped = false
             end
