@@ -97,7 +97,7 @@ local function move_block_pusher(target_lvl)
         pusher_lvl = new or pusher_lvl
 
     elseif target_lvl == 0 then
-        _, new = sendAndWait(nodePusher, -15, "LVL 0")
+        _, new = sendAndWait(nodePusher, -15, "LVL 1")
         pusher_lvl = new or pusher_lvl
     end
 end
@@ -122,7 +122,7 @@ function farm_cycle()
     deploy()
     sleep(6)
 
-    -- === Blind climb from LVL 0 to LVL 6 ===
+    -- === Blind climb from LVL 1 to LVL 6 ===
     local reached_lv6 = false
 
     while not reached_lv6 do
