@@ -25,6 +25,7 @@ local drill_state = true
 local pusher_lvl = 0
 local manual_stop = true
 local drawer_stop = false
+local farm_running = false
 
 -- === Logging ===
 local function logs(msg)
@@ -46,6 +47,19 @@ local function waitForReply(keyword)
             return msg, lvl
         end
     end
+end
+
+local function waitForReplyWithTimeout(keyword, timeout)
+    local start = os.clock()
+    while os.clock() - start < timeout do
+        local _, msg = rednet.receive(timeout)
+        if msg and msg:find(keyword) then
+            logs(msg)
+            local lvl = tonumber(string.match(msg, "LVL ?(%d+)"))
+            return msg, lvl
+        end
+    end
+    return nil, nil
 end
 
 local function sendAndWait(id, msg, keyword)
@@ -102,6 +116,40 @@ local function move_block_pusher(target_lvl)
     end
 end
 
+function upward_plate_sequence_with_timeout()
+    local timeout_duration = 20
+    local last_feedback_time = os.clock()
+
+    while pusher_lvl < 15 do
+        send(nodePusher, 1) -- ask to move plate 1 up
+        sleep(0.1)
+        local lvl_reply, new_lvl = waitForReplyWithTimeout("LVL", 3)
+        if new_lvl then
+            pusher_lvl = new_lvl
+            last_feedback_time = os.clock()
+            toggle_drills()
+        else
+            -- No level feedback received in this step
+            if os.clock() - last_feedback_time >= timeout_duration then
+                logs("No LVL feedback for 20s. Triggering drill recovery.")
+                -- Wait for drill to finish their run
+                toggle_drills()
+                waitForReply(drill_state and "DFF" or "DFB") -- or DFB depending on current state
+                logs("Drill finished. Lowering plate to retry.")
+
+                -- Move 1 step down (reverse)
+                send(nodePusher, -1)
+                waitForReply("LVL") -- catch the level again
+                pusher_lvl = pusher_lvl - 1
+
+                -- Restart drilling
+                toggle_drills()
+
+                last_feedback_time = os.clock()
+            end
+        end
+    end
+end
 
 function reset()
     move_block_pusher(0)
@@ -111,10 +159,27 @@ function reset()
     end
 end
 
+
+
+
+
+local function stats_summary(start_time, fallback_count)
+    local duration = os.clock() - start_time
+    logs("=== Cycle Stats ===")
+    logs("Duration        : " .. string.format("%.1f", duration) .. "s")
+    logs("Final Plate LVL : " .. tostring(pusher_lvl))
+    logs("Drill Direction : " .. (drill_state and "Forward" or "Backward"))
+    logs("Fallback Retries: " .. tostring(fallback_count))
+    logs("====================")
+end
+
 -- === Farm Loop ===
 function farm_cycle()
     if farm_running then return end
     farm_running = true
+
+    local start_time = os.clock()
+    local fallback_count = 0
 
     logs("Starting new cycle.")
     sleep(0.5)
@@ -122,45 +187,48 @@ function farm_cycle()
     deploy()
     sleep(6)
 
-    -- === Blind climb from LVL 1 to LVL 6 ===
-    local reached_lv6 = false
+    -- === Blind climb from LVL 1 to LVL 5 ===
+    local reached_lv5 = false
 
-    while not reached_lv6 do
-        local start = os.clock()
+    while not reached_lv5 do
+        local climb_start = os.clock()
         local timeout = 7
 
-        while os.clock() - start < timeout do
-            move_block_pusher_timed(1)
+        while os.clock() - climb_start < timeout do
+            move_block_pusher(1)
             sleep(0.5)
 
-            if pusher_lvl >= 6 then
-                reached_lv6 = true
+            if pusher_lvl >= 5 then
+                reached_lv5 = true
                 break
             end
         end
 
-        if not reached_lv6 then
-            logs("LVL 6 not reached within 7s. Moving 1 block down and retrying...")
-            send(nodePusher, -1)  -- Blind move down
+        if not reached_lv5 then
+            logs("LVL 5 not reached within 7s. Moving 1 block down and retrying...")
+            fallback_count = fallback_count + 1
+            send(nodePusher, -1)
             sleep(1.5)
         end
     end
 
-    logs("Reached LVL 6. Beginning drill-assisted push to LVL 15.")
+    logs("Reached LVL 5. Beginning drill-assisted push to LVL 15.")
 
     -- === Drill + Push Loop ===
-    while pusher_lvl < 15 do 
-        move_block_pusher(1)
-        toggle_drills()
-        sleep(0.5)
-    end
+    upward_plate_sequence_with_timeout()
 
     logs("Cycle finished. Resetting.")
 
     reset()
+
+    stats_summary(start_time, fallback_count)
+
     logs("Farm ready for new cycle.")
     farm_running = false
 end
+
+
+
 -- === Listener for Stop/Start ===
 local function listenControl()
     while true do
