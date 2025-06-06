@@ -19,6 +19,7 @@ local ptc_status  = "sky-status"
 local kw_drills_forward  = "forward"
 local kw_drills_backward = "backward"
 local kw_deploy          = "deploy"
+local kw_sky_fill = "sky-fill"
 
 -- === State ===
 local pusher_lvl   = 1
