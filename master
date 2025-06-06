@@ -15,11 +15,21 @@ local ptc_reply   = "sky-reply"
 local ptc_logs    = "sky-logs"
 local ptc_status  = "sky-status"
 
--- === Keywords ===
-local kw_drills_forward  = "forward"
-local kw_drills_backward = "backward"
-local kw_deploy          = "deploy"
-local kw_sky_fill = "sky-fill"
+-- === Keyword Messages ===
+local kw_drills_forward     = "forward"
+local kw_drills_backward    = "backward"
+local kw_deploy             = "deploy"
+local kw_lv_feedback        = "LVL"
+local kw_lv_max             = "LVL 15"
+local kw_lv_min             = "LVL 1"
+local kw_drill_forward_ack  = "DFF"
+local kw_drill_backward_ack = "DFB"
+local kw_reset              = -15
+local kw_ping               = "ping"
+local kw_pong               = "pong"
+local kw_stop               = "stop"
+local kw_start              = "start"
+local kw_fill               = "sky-fill" -- ⬅️ drawer % query keyword
 
 -- === State ===
 local pusher_lvl   = 1
@@ -30,7 +40,7 @@ local farm_running = false
 
 -- === Config ===
 local drawer_stop_threshold   = 90  -- Stop if >= 90%
-local drawer_resume_threshold = 10  -- Resume only if < 10%
+local drawer_resume_threshold = 10  -- Resume if <= 10%
 
 -- === Logging ===
 local function logs(msg)
@@ -48,7 +58,7 @@ local function waitForReply(keyword)
         local _, msg = rednet.receive()
         if msg and msg:find(keyword) then
             logs(msg)
-            return tonumber(string.match(msg, "LVL ?(%d+)"))
+            return tonumber(string.match(msg, kw_lv_feedback .. " ?(%d+)"))
         end
     end
 end
@@ -59,7 +69,7 @@ local function waitForReplyWithTimeout(keyword, timeout)
         local _, msg = rednet.receive(timeout)
         if msg and msg:find(keyword) then
             logs(msg)
-            return tonumber(string.match(msg, "LVL ?(%d+)"))
+            return tonumber(string.match(msg, kw_lv_feedback .. " ?(%d+)"))
         end
     end
     return nil
@@ -72,11 +82,11 @@ end
 
 local function pingNode(id, timeout)
     logs("Pinging node: " .. id)
-    rednet.send(id, "ping", ptc_status)
+    rednet.send(id, kw_ping, ptc_status)
     local start = os.clock()
     while os.clock() - start < timeout do
         local sender, msg, protocol = rednet.receive(ptc_reply, timeout)
-        if sender == id and msg == "pong" then
+        if sender == id and msg == kw_pong then
             logs("Node " .. id .. " responded.")
             return true
         end
@@ -96,8 +106,9 @@ end
 
 -- === Movement ===
 local function move_drills(reverse)
-    local dir = reverse and kw_drills_backward or kw_drills_forward
-    sendAndWait(nodeDrills, dir, reverse and "DFB" or "DFF")
+    local cmd = reverse and kw_drills_backward or kw_drills_forward
+    local ack = reverse and kw_drill_backward_ack or kw_drill_forward_ack
+    sendAndWait(nodeDrills, cmd, ack)
     drill_state = not reverse
 end
 
@@ -112,10 +123,10 @@ end
 local function move_block_pusher(target)
     if target == 1 then
         send(nodePusher, 1)
-        local lvl = waitForReply(pusher_lvl == 14 and "LVL 15" or "LVL")
+        local lvl = waitForReply(pusher_lvl == 14 and kw_lv_max or kw_lv_feedback)
         pusher_lvl = lvl or pusher_lvl
     elseif target == 0 then
-        local lvl = sendAndWait(nodePusher, -15, "LVL 1")
+        local lvl = sendAndWait(nodePusher, kw_reset, kw_lv_min)
         pusher_lvl = lvl or pusher_lvl
     end
 end
@@ -128,7 +139,7 @@ local function upward_plate_sequence_with_timeout()
         send(nodePusher, 1)
         sleep(0.1)
 
-        local lvl = waitForReplyWithTimeout("LVL", 3)
+        local lvl = waitForReplyWithTimeout(kw_lv_feedback, 3)
         if lvl then
             pusher_lvl = lvl
             last_feedback = os.clock()
@@ -137,10 +148,10 @@ local function upward_plate_sequence_with_timeout()
             logs("No LVL feedback for 20s. Waiting drill end, retrying...")
 
             toggle_drills()
-            waitForReply(drill_state and "DFF" or "DFB")
+            waitForReply(drill_state and kw_drill_forward_ack or kw_drill_backward_ack)
 
             send(nodePusher, -1)
-            local back_lvl = waitForReply("LVL")
+            local back_lvl = waitForReply(kw_lv_feedback)
             if back_lvl then pusher_lvl = back_lvl end
 
             toggle_drills()
@@ -178,7 +189,6 @@ local function farm_cycle()
     deploy()
     sleep(6)
 
-    -- Climb to LVL 5
     local reached_lv5 = false
     while not reached_lv5 do
         local climb_start = os.clock()
@@ -198,25 +208,25 @@ local function farm_cycle()
         end
     end
 
-    logs("Reached LVL 5. Starting upward climb with drills.")
+    logs("Reached LVL 5. Starting drill-assisted climb to LVL 15.")
     upward_plate_sequence_with_timeout()
 
-    logs("Cycle finished. Resetting.")
+    logs("Cycle complete. Resetting.")
     reset()
     stats_summary(start_time, fallback_count)
-    logs("Farm ready for new cycle.")
+    logs("Farm ready.")
     farm_running = false
 end
 
--- === Listeners ===
+-- === Listener ===
 local function listenControl()
     while true do
         local sender, msg, protocol = rednet.receive()
         if protocol == ptc_control then
-            if msg == "stop" and sender == nodeMonitor then
+            if msg == kw_stop and sender == nodeMonitor then
                 manual_stop = true
                 logs("Manual stop triggered.")
-            elseif msg == "start" and sender == nodeMonitor then
+            elseif msg == kw_start and sender == nodeMonitor then
                 manual_stop = false
                 logs("Manual start triggered.")
             end
@@ -224,13 +234,14 @@ local function listenControl()
     end
 end
 
+-- === Wait Button ===
 local function waitManualStart()
-    logs("Waiting for START button on monitor...")
+    logs("Waiting for monitor start signal...")
     while manual_stop do sleep(0.5) end
 end
 
--- === Startup ===
-logs("Pinging nodes...")
+-- === Init ===
+logs("Pinging all nodes...")
 for _, id in ipairs({ nodeDrills, nodePusher, nodeDeploy, nodeDrawer }) do
     pingNode(id, 4)
 end
@@ -238,7 +249,7 @@ end
 logs("Resetting system...")
 reset()
 
--- === Main Loop ===
+-- === Main ===
 parallel.waitForAny(
     listenControl,
     function()
@@ -246,16 +257,12 @@ parallel.waitForAny(
         while true do
             local percent = getDrawerPercent()
             if percent then
-                if percent >= drawer_stop_threshold then
-                    if not drawer_stop then
-                        logs("Drawer filled (" .. percent .. "%) — auto-stop triggered.")
-                        drawer_stop = true
-                    end
-                elseif percent <= drawer_resume_threshold then
-                    if drawer_stop then
-                        logs("Drawer cleared (" .. percent .. "%) — auto-resume allowed.")
-                        drawer_stop = false
-                    end
+                if percent >= drawer_stop_threshold and not drawer_stop then
+                    drawer_stop = true
+                    logs("Drawer threshold reached (" .. percent .. "%). Auto-stop.")
+                elseif percent <= drawer_resume_threshold and drawer_stop then
+                    drawer_stop = false
+                    logs("Drawer emptied (" .. percent .. "%). Auto-resume.")
                 end
             end
 
