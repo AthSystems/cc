@@ -1,7 +1,8 @@
 -- === Setup ===
-local side = "top"
-local monitor = peripheral.wrap(side)
-if not monitor then error("No monitor found on top") end
+local modem = peripheral.find("modem") or error("No modem found")
+rednet.open(peripheral.getName(modem))
+
+local monitor = peripheral.find("monitor") or error("No monitor found")
 monitor.setTextScale(1)
 monitor.setBackgroundColor(colors.black)
 monitor.setTextColor(colors.white)
