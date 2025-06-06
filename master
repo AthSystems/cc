@@ -174,6 +174,67 @@ local function stats_summary(start_time, fallback_count)
 end
 
 -- === Farm Loop ===
+
+function farm_cycle()
+    if farm_running then return end
+    farm_running = true
+
+    logs("Starting new cycle.")
+    sleep(0.5)
+
+    deploy()
+    sleep(6)
+
+    -- === Controlled climb from LVL 1 to LVL 5 with feedback ===
+    local reached_lv5 = false
+    local fallback_count = 0
+    local climb_timeout = 7
+
+    while not reached_lv5 do
+        local climb_start = os.clock()
+
+        while os.clock() - climb_start < climb_timeout do
+            send(nodePusher, 1)
+
+            local _, new_lvl = waitForReply("LVL")
+            if new_lvl then
+                pusher_lvl = new_lvl
+                if pusher_lvl >= 5 then
+                    reached_lv5 = true
+                    break
+                end
+            end
+
+            sleep(0.3)
+        end
+
+        if not reached_lv5 then
+            logs("LVL 5 not reached within 7s. Moving 1 block down and retrying...")
+            fallback_count = fallback_count + 1
+            send(nodePusher, -1)
+            local _, new_lvl = waitForReply("LVL")
+            if new_lvl then
+                pusher_lvl = new_lvl
+            end
+            sleep(1)
+        end
+    end
+
+    logs("Reached LVL 5. Beginning drill-assisted push to LVL 15.")
+
+    -- === Drill + Push Loop ===
+    upward_plate_sequence_with_timeout()
+
+    logs("Cycle finished. Resetting.")
+
+    reset()
+    stats_summary(start_time, fallback_count)
+
+    logs("Farm ready for new cycle.")
+    farm_running = false
+end
+
+
 function farm_cycle()
     if farm_running then return end
     farm_running = true
