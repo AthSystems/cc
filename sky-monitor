@@ -6,92 +6,159 @@ local monitor = peripheral.find("monitor") or error("No monitor found")
 monitor.setTextScale(1)
 monitor.setBackgroundColor(colors.black)
 monitor.setTextColor(colors.white)
+monitor.clear()
 
--- === Config ===
-local kw_control = "sky-control"
-local kw_logs = "sky-logs"
-local kw_stop = "stop"
+-- === Constants ===
+local kw_logs     = "sky-logs"
+local kw_control  = "sky-control"
+local kw_status   = "sky-status"
+
 local kw_start = "start"
-local button_x1, button_y1 = 2, 2
-local button_x2, button_y2 = 17, 4
+local kw_stop  = "stop"
+
+-- === ID → Name Table ===
+local node_names = {
+    [0]  = "Drill",
+    [2]  = "DFF",
+    [3]  = "DFB",
+    [5]  = "Push",
+    [6]  = "LV 1",
+    [7]  = "LV 6",
+    [8]  = "LV 8",
+    [9]  = "LV 10",
+    [10] = "LV 12",
+    [11] = "LV 14",
+    [12] = "LV 5",
+    [13] = "LV 7",
+    [14] = "LV 9",
+    [15] = "LV 11",
+    [16] = "LV 13",
+    [17] = "LV 15",
+    [20] = "Deployer",
+    [23] = "Drawer",
+    [24] = "Monitor",
+    [25] = "LV 3",
+    [26] = "LV 2",
+    [27] = "LV 4",
+}
 
 -- === State ===
 local is_running = false
+local log_lines = {}
+local screen_w, screen_h = monitor.getSize()
+local log_area_height = screen_h - 2
 
--- === UI ===
-local function draw_button()
-    monitor.clear()
-    monitor.setCursorPos(1, 1)
-    monitor.write("Sky Farm Monitor")
+-- === Colors ===
+local color_time   = colors.lime
+local color_sender = colors.orange
+local color_msg    = colors.white
+local color_button_bg = colors.gray
+local color_button_fg = colors.black
 
-    monitor.setCursorPos(button_x1, button_y1)
-    if is_running then
-        monitor.setBackgroundColor(colors.red)
-        monitor.setTextColor(colors.white)
-        monitor.setCursorPos(button_x1, button_y1)
-        monitor.write("   STOP FARM   ")
-    else
-        monitor.setBackgroundColor(colors.lime)
-        monitor.setTextColor(colors.black)
-        monitor.setCursorPos(button_x1, button_y1)
-        monitor.write("   START FARM  ")
+-- === Utilities ===
+local function getName(id)
+    return node_names[id] or ("ID " .. tostring(id))
+end
+
+local function add_log(sender, message)
+    table.insert(log_lines, {
+        time = os.date("%H:%M:%S"),
+        sender = getName(sender),
+        msg = tostring(message)
+    })
+    if #log_lines > log_area_height then
+        table.remove(log_lines, 1)
     end
+end
+
+local function redraw_logs()
     monitor.setBackgroundColor(colors.black)
-    monitor.setTextColor(colors.white)
+    monitor.clear()
+
+    for i, entry in ipairs(log_lines) do
+        monitor.setCursorPos(1, i)
+
+        monitor.setTextColor(color_time)
+        monitor.write("[" .. entry.time .. "] ")
+
+        monitor.setTextColor(color_sender)
+        monitor.write("[" .. entry.sender .. "] ")
+
+        monitor.setTextColor(color_msg)
+        monitor.write(entry.msg)
+    end
+
+    -- Draw buttons
+    monitor.setBackgroundColor(color_button_bg)
+    monitor.setTextColor(color_button_fg)
+
+    monitor.setCursorPos(1, screen_h)
+    if is_running then
+        monitor.write("[ STOP ]")
+    else
+        monitor.write("[ START ]")
+    end
+
+    monitor.setCursorPos(screen_w - 7, screen_h)
+    monitor.write("[CLEAR]")
 end
 
-local function is_within_button(x, y)
-    return x >= button_x1 and x <= button_x2 and y >= button_y1 and y <= button_y2
+local function clear_logs()
+    log_lines = {}
+    redraw_logs()
 end
 
--- === Communication ===
-local function sendControl(msg)
+local function send_control(msg)
     rednet.broadcast(msg, kw_control)
 end
 
--- === Event Loop ===
-local function listen_touch()
+-- === Handlers ===
+local function handle_touch(x, y)
+    if y == screen_h then
+        if x >= 1 and x <= 8 then
+            is_running = not is_running
+            send_control(is_running and kw_start or kw_stop)
+            redraw_logs()
+        elseif x >= screen_w - 7 then
+            clear_logs()
+        end
+    end
+end
+
+local function handle_logs()
     while true do
-        local event, side, x, y = os.pullEvent("monitor_touch")
-        if is_within_button(x, y) then
-            if is_running then
-                sendControl(kw_stop)
-                is_running = false
-            else
-                sendControl(kw_start)
-                is_running = true
+        local sender, msg, proto = rednet.receive()
+        if proto == kw_logs then
+            if type(msg) == "string" then
+                add_log(sender, msg)
+                redraw_logs()
+            elseif type(msg) == "table" and msg.percent then
+                local stat = string.format("%.1f%% full (%s)", msg.percent, msg.status)
+                add_log(sender, stat)
+                redraw_logs()
             end
-            draw_button()
-        end
-    end
-end
-
-local function listen_logs()
-    while true do
-        local _, msg, protocol = rednet.receive(kw_logs)
-        if type(msg) == "string" then
-            print(msg)
-        elseif type(msg) == "table" and msg.status then
-            -- This is a drawer status log (optional print)
-            print(string.format("[Drawer] %.1f%% full (%s)", msg.percent or 0, msg.status))
-        end
-    end
-end
-
-local function listen_control_state()
-    while true do
-        local _, msg, proto = rednet.receive(kw_control)
-        if msg == kw_stop then
-            is_running = false
-            draw_button()
-        elseif msg == kw_start then
-            is_running = true
-            draw_button()
+        elseif proto == kw_control then
+            if msg == kw_stop then
+                is_running = false
+                redraw_logs()
+            elseif msg == kw_start then
+                is_running = true
+                redraw_logs()
+            end
+        elseif proto == kw_status then
+            add_log(sender, msg)
+            redraw_logs()
         end
     end
 end
 
 -- === Launch ===
-rednet.open("back")
-draw_button()
-parallel.waitForAny(listen_touch, listen_logs, listen_control_state)
+parallel.waitForAny(
+    handle_logs,
+    function()
+        while true do
+            local _, _, x, y = os.pullEvent("monitor_touch")
+            handle_touch(x, y)
+        end
+    end
+)
