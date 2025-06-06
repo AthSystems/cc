@@ -22,7 +22,7 @@ local kw_deploy             = "deploy"
 
 -- === State ===
 local drill_state = true
-local pusher_lvl = 0
+local pusher_lvl = 1
 local manual_stop = true
 local drawer_stop = false
 local farm_running = false
@@ -280,6 +280,14 @@ parallel.waitForAny(
         while true do
             if not manual_stop and not drawer_stop then
                 farm_cycle()
+
+                -- Add these log checks right after farm_cycle ends
+                if manual_stop then
+                    logs("Manual stop active after cycle. Waiting for resume.")
+                end
+                if drawer_stop then
+                    logs("Drawer stop active after cycle. Waiting for drawer to empty.")
+                end
             end
             sleep(0.5)
         end
