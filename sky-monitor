@@ -96,18 +96,23 @@ end
 -- === Listeners ===
 local function listenLogs()
     while true do
-        local senderID, msg, protocol = rednet.receive(ptc_logs)
+        local senderID, msg, protocol = rednet.receive(ptc_logs, 0.5)
 
-        if type(msg) == "string" then
-            addLine(senderID, msg)
-        elseif type(msg) == "table" then
-            local src, body = formatFromTable(msg)
-            addLine(senderID, body)
+        if senderID ~= nil then
+            if type(msg) == "string" then
+                addLine(senderID, msg)
+            elseif type(msg) == "table" then
+                local src, body = formatFromTable(msg)
+                addLine(senderID, body)
+            else
+                addLine(senderID, "Invalid message type")
+            end
         else
-            addLine(senderID, "Invalid message type")
+            drawUI() -- Refresh UI even if no message received
         end
     end
 end
+
 
 local function listenTouch()
     while true do
