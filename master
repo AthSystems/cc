@@ -86,7 +86,7 @@ local function pingNode(id, timeout)
 end
 
 local function getDrawerPercent()
-    rednet.send(nodeDrawer, "query", ptc_control)
+    rednet.send(nodeDrawer, kw_fill, ptc_control)
     local sender, msg, protocol = rednet.receive(ptc_status, 1)
     if sender == nodeDrawer then
         return tonumber(msg)
