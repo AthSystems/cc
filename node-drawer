@@ -1,21 +1,20 @@
 -- === Setup ===
 local drawer_side = "back"
-local modem = peripheral.find("modem") or error("No modem", 0)
+local modem = peripheral.find("modem") or error("No modem found")
 rednet.open(peripheral.getName(modem))
-local drawer = peripheral.wrap(drawer_side) or error("No drawer found", 0)
 
--- === Configuration ===
-local master_id = 1
+local drawer = peripheral.wrap(drawer_side) or error("No drawer found")
+
+-- === Config ===
 local monitor_id = 24
 local node_name = "drawerNode"
 local slot = 1
-local threshold_stop = 90
-local threshold_resume = 10
 local ptc_logs = "sky-logs"
 local ptc_status = "sky-status"
 local ptc_control = "sky-control"
+local ptc_replay = "sky-reply"
 
-local auto_stopped = false
+local kw_fill = "sky-fill"
 
 -- === Utilities ===
 local function log(msg)
@@ -26,50 +25,45 @@ end
 local function getDrawerData()
     local item = drawer.getItemDetail(slot)
     if not item then return nil end
-    local name = item.displayName
     local count = item.count
     local limit = drawer.getItemLimit(slot)
     local percent = (count / limit) * 100
     return {
         source = node_name,
-        item = name,
+        item = item.displayName,
         count = count,
         limit = limit,
         percent = percent,
-        status = percent >= threshold_stop and "NEAR FULL" or "NORMAL"
+        status = percent >= 90 and "NEAR FULL" or "NORMAL"
     }
 end
 
--- === Drawer Check Loop ===
+-- === Monitor Loop ===
 local function monitorDrawer()
     while true do
         local data = getDrawerData()
         if data then
-            if data.percent >= threshold_stop and not auto_stopped then
-                rednet.send(master_id, "stop", ptc_control) 
-                log("Threshold exceeded: sending STOP")
-                auto_stopped = true
-            elseif data.percent <= threshold_resume and auto_stopped then
-                rednet.send(master_id, "start", ptc_control)
-                log("Below resume threshold: sending START")
-                auto_stopped = false
-            end
             rednet.send(monitor_id, data, ptc_logs)
         end
         sleep(1)
     end
 end
 
--- === Ping Handler ===
+-- === Listener ===
 local function listen()
     while true do
         local id, msg, protocol = rednet.receive()
         if msg == "ping" then
-            rednet.send(id, "pong", "sky-reply")
+            rednet.send(id, "pong", ptc-status)
+        elseif msg == kw_fill then
+            local data = getDrawerData()
+            if data then
+                rednet.send(id, tostring(data.percent), ptc_reply)
+            end
         end
     end
 end
 
--- === Launch ===
+-- === Start ===
 log("Drawer node ready.")
 parallel.waitForAll(monitorDrawer, listen)
