@@ -1,142 +1,96 @@
 -- === Setup ===
-local modem = peripheral.find("modem") or error("No modem found")
-local monitor = peripheral.find("monitor") or error("No monitor found")
-rednet.open(peripheral.getName(modem))
+local side = "top"
+local monitor = peripheral.wrap(side)
+if not monitor then error("No monitor found on top") end
+monitor.setTextScale(1)
+monitor.setBackgroundColor(colors.black)
+monitor.setTextColor(colors.white)
 
 -- === Config ===
-local master_id = 1
-local ptc_logs = "sky-logs"
-local ptc_control = "sky-control"
+local kw_control = "sky-control"
+local kw_logs = "sky-logs"
+local kw_stop = "stop"
+local kw_start = "start"
+local button_x1, button_y1 = 2, 2
+local button_x2, button_y2 = 17, 4
 
--- === ID to Name Map ===
-local idMap = {
-    [0] = "Drills", [1] = "Master", [2] = "DFF", [3] = "DFB", [5] = "Pusher",
-    [6] = "LV 1", [7] = "LV 6", [8] = "LV 8", [9] = "LV 10",
-    [10] = "LV 12", [11] = "LV 14", [12] = "LV 5", [13] = "LV 7",
-    [14] = "LV 9", [15] = "LV 11", [16] = "LV 13", [17] = "LV 15",
-    [20] = "Deployer", [23] = "Drawer", [24] = "Monitor", [25] = "LV 3",
-    [26] = "LV 2", [27] = "LV 4"
-}
+-- === State ===
+local is_running = false
 
--- === Monitor Setup ===
-monitor.setTextScale(0.5)
-monitor.setBackgroundColor(colors.black)
-monitor.clear()
-local width, height = monitor.getSize()
-local lines = {}
-local isRunning = false
-
--- === Button Config ===
-local toggle_button = {
-    label = "[  START  ]",
-    x = math.floor((width - 11) / 2), -- 11 chars wide
-    y = height,
-    w = 11
-}
-local clear_button = {
-    label = "[ CLEAR ]",
-    x = width - 8,
-    y = height,
-    w = 8
-}
-
--- === Utilities ===
-local function drawUI()
-    monitor.setBackgroundColor(colors.black)
+-- === UI ===
+local function draw_button()
     monitor.clear()
+    monitor.setCursorPos(1, 1)
+    monitor.write("Sky Farm Monitor")
 
-    local logHeight = height - 1
-    for i, entry in ipairs(lines) do
-        if i > logHeight then break end
-        monitor.setCursorPos(1, i)
-
-        monitor.setTextColor(colors.lime)
-        monitor.write(entry.time .. " | ")
-
-        monitor.setTextColor(colors.orange)
-        monitor.write(entry.source)
-
+    monitor.setCursorPos(button_x1, button_y1)
+    if is_running then
+        monitor.setBackgroundColor(colors.red)
         monitor.setTextColor(colors.white)
-        monitor.write(" -> " .. entry.message)
+        monitor.setCursorPos(button_x1, button_y1)
+        monitor.write("   STOP FARM   ")
+    else
+        monitor.setBackgroundColor(colors.lime)
+        monitor.setTextColor(colors.black)
+        monitor.setCursorPos(button_x1, button_y1)
+        monitor.write("   START FARM  ")
     end
-
-    -- Toggle Button
-    monitor.setCursorPos(toggle_button.x, toggle_button.y)
-    monitor.setBackgroundColor(isRunning and colors.red or colors.green)
+    monitor.setBackgroundColor(colors.black)
     monitor.setTextColor(colors.white)
-    monitor.write(toggle_button.label)
-
-    -- Clear Button
-    monitor.setCursorPos(clear_button.x, clear_button.y)
-    monitor.setBackgroundColor(colors.gray)
-    monitor.setTextColor(colors.white)
-    monitor.write(clear_button.label)
 end
 
-local function addLine(senderID, message)
-    local time = os.date("%H:%M:%S")
-    local name = idMap[senderID] or ("ID:" .. tostring(senderID))
-    table.insert(lines, { time = time, source = name, message = message })
-
-    if #lines > (height - 1) then
-        table.remove(lines, 1)
-    end
-
-    drawUI()
+local function is_within_button(x, y)
+    return x >= button_x1 and x <= button_x2 and y >= button_y1 and y <= button_y2
 end
 
-local function formatFromTable(tbl)
-    local source = tbl.source or "unknown"
-    local msg = tbl.status or tbl.message or tbl.msg or "unknown"
-    if tbl.level then
-        source = source .. " @ LVL " .. tostring(tbl.level)
-    end
-    return source, msg
+-- === Communication ===
+local function sendControl(msg)
+    rednet.broadcast(msg, kw_control)
 end
 
--- === Listeners ===
-local function listenLogs()
+-- === Event Loop ===
+local function listen_touch()
     while true do
-        local senderID, msg, protocol = rednet.receive(ptc_logs, 0.5)
-
-        if senderID ~= nil then
-            if type(msg) == "string" then
-                addLine(senderID, msg)
-            elseif type(msg) == "table" then
-                local src, body = formatFromTable(msg)
-                addLine(senderID, body)
+        local event, side, x, y = os.pullEvent("monitor_touch")
+        if is_within_button(x, y) then
+            if is_running then
+                sendControl(kw_stop)
+                is_running = false
             else
-                addLine(senderID, "Invalid message type")
+                sendControl(kw_start)
+                is_running = true
             end
-        else
-            drawUI() -- Refresh UI even if no message received
+            draw_button()
         end
     end
 end
 
-
-local function listenTouch()
+local function listen_logs()
     while true do
-        local _, _, x, y = os.pullEvent("monitor_touch")
+        local _, msg, protocol = rednet.receive(kw_logs)
+        if type(msg) == "string" then
+            print(msg)
+        elseif type(msg) == "table" and msg.status then
+            -- This is a drawer status log (optional print)
+            print(string.format("[Drawer] %.1f%% full (%s)", msg.percent or 0, msg.status))
+        end
+    end
+end
 
-        if y == toggle_button.y then
-            if x >= toggle_button.x and x <= toggle_button.x + toggle_button.w - 1 then
-                isRunning = not isRunning
-                toggle_button.label = isRunning and "[  STOP   ]" or "[  START  ]"
-                rednet.send(master_id, isRunning and "start" or "stop", ptc_control)
-                table.insert(lines, {
-                    time = os.date("%H:%M:%S"),
-                    source = "Monitor",
-                    message = (isRunning and "START" or "STOP") .. " sent to master"
-                })
-                drawUI()
-            elseif x >= clear_button.x and x <= clear_button.x + clear_button.w - 1 then
-                lines = {}
-                drawUI()
-            end
+local function listen_control_state()
+    while true do
+        local _, msg, proto = rednet.receive(kw_control)
+        if msg == kw_stop then
+            is_running = false
+            draw_button()
+        elseif msg == kw_start then
+            is_running = true
+            draw_button()
         end
     end
 end
 
 -- === Launch ===
-parallel.waitForAll(listenLogs, listenTouch)
+rednet.open("back")
+draw_button()
+parallel.waitForAny(listen_touch, listen_logs, listen_control_state)
